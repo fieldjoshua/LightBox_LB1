@@ -5,7 +5,7 @@
 set -e
 
 PI_HOST="lightbox.local"
-PI_USER="pi"
+PI_USER="joshuafield"
 PI_PROJECT_DIR="~/LightBox_Organized"
 MOUNT_POINT="/tmp/pi_mount"
 
