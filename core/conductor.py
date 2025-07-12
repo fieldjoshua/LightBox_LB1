@@ -265,7 +265,11 @@ class Conductor:
         
         # Stop web server if running
         if self.web_server:
-            self.web_server.stop()
+            try:
+                # Flask apps don't have a stop method, but we can log it
+                logger.info("Web server shutdown requested")
+            except Exception as e:
+                logger.warning(f"Error stopping web server: {e}")
         
         # Clean up hardware
         if self.hardware:

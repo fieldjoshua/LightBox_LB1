@@ -11,6 +11,7 @@ class LightBoxController {
         this.animations = [];
         this.presets = [];
         this.updateInterval = null;
+        this.programs = []; // Use 'programs' to be consistent with backend
         
         this.init();
     }
@@ -42,6 +43,16 @@ class LightBoxController {
 
         document.getElementById('palette').addEventListener('change', (e) => {
             this.updateConfig('color_palette', e.target.value);
+        });
+
+        // Program selection and switching
+        document.getElementById('program-select').addEventListener('change', () => {
+            this.loadProgramParameters();
+        });
+
+        document.getElementById('switch-program').addEventListener('click', () => {
+            const programName = document.getElementById('program-select').value;
+            this.switchProgram(programName);
         });
 
         // Hardware configuration inputs
@@ -197,26 +208,13 @@ class LightBoxController {
 
     async loadInitialData() {
         try {
-            // Load current configuration
-            const configResponse = await fetch('/api/config');
-            this.currentConfig = await configResponse.json();
-            this.updateUIFromConfig();
-
-            // Load animations
-            const animationsResponse = await fetch('/api/animations');
-            this.animations = await animationsResponse.json();
-            this.populateAnimationList();
-
-            // Load presets
-            const presetsResponse = await fetch('/api/presets');
-            this.presets = await presetsResponse.json();
-            this.populatePresetList();
-
-            // Load system info
             const statusResponse = await fetch('/api/status');
             const status = await statusResponse.json();
-            this.updateSystemInfo(status);
-
+            this.programs = status.programs;
+            this.currentConfig = status.config;
+            this.populateProgramList();
+            this.updateUIFromConfig();
+            // Presets and other data can be loaded here as before
         } catch (error) {
             console.error('Error loading initial data:', error);
         }
@@ -251,103 +249,72 @@ class LightBoxController {
         }
     }
 
-    populateAnimationList() {
-        const animationSelect = document.getElementById('animation');
-        const animationList = document.getElementById('animation-list');
+    populateProgramList() {
+        const select = document.getElementById('program-select');
+        select.innerHTML = '';
+        this.programs.forEach(program => {
+            const option = document.createElement('option');
+            option.value = program;
+            option.textContent = program.charAt(0).toUpperCase() + program.slice(1);
+            select.appendChild(option);
+        });
+        // Set the current program as selected
+        if (this.currentConfig.current_program) {
+            select.value = this.currentConfig.current_program;
+        }
+        this.loadProgramParameters(); // Load params for the selected program
+    }
+
+    async loadProgramParameters() {
+        const programName = document.getElementById('program-select').value;
+        if (!programName) return;
+
+        try {
+            const response = await fetch(`/api/program-parameters/${programName}`);
+            const data = await response.json();
+            this.renderParameters(data.parameters);
+        } catch (error) {
+            console.error(`Error loading parameters for ${programName}:`, error);
+        }
+    }
+
+    renderParameters(parameters) {
+        const container = document.getElementById('program-parameters-container');
+        container.innerHTML = ''; // Clear existing controls
         
-        animationSelect.innerHTML = '<option value="">Select animation...</option>';
-        animationList.innerHTML = '';
+        for (const key in parameters) {
+            const param = parameters[key];
+            const controlGroup = document.createElement('div');
+            controlGroup.className = 'control-group';
 
-        this.animations.forEach(animation => {
-            // Add to dropdown
-            const option = document.createElement('option');
-            option.value = animation.name;
-            option.textContent = animation.name;
-            animationSelect.appendChild(option);
+            const label = document.createElement('label');
+            label.setAttribute('for', key);
+            label.textContent = param.description || key;
+            
+            let input;
+            // Create sliders, inputs, etc. based on param.type
+            if (param.type === 'range') {
+                input = document.createElement('input');
+                input.type = 'range';
+                input.min = param.min || 0;
+                input.max = param.max || 100;
+                input.step = param.step || 1;
+                input.value = param.value || param.default;
+            } else { // Default to text input
+                input = document.createElement('input');
+                input.type = 'text';
+                input.value = param.value || param.default;
+            }
+            input.id = key;
 
-            // Add to list
-            const item = document.createElement('div');
-            item.className = 'animation-item';
-            item.textContent = animation.name;
-            item.addEventListener('click', () => {
-                document.querySelectorAll('.animation-item').forEach(i => i.classList.remove('active'));
-                item.classList.add('active');
-                this.updateConfig('animation_program', animation.name);
-                this.showAnimationParams(animation);
+            controlGroup.appendChild(label);
+            controlGroup.appendChild(input);
+            container.appendChild(controlGroup);
+            
+            // Add event listener to update parameter on change
+            input.addEventListener('change', (e) => {
+                this.updateProgramParameter(programName, key, e.target.value);
             });
-            animationList.appendChild(item);
-        });
-    }
-
-    populatePresetList() {
-        const presetSelect = document.getElementById('preset-list');
-        presetSelect.innerHTML = '<option value="">Select preset...</option>';
-
-        this.presets.forEach(preset => {
-            const option = document.createElement('option');
-            option.value = preset;
-            option.textContent = preset;
-            presetSelect.appendChild(option);
-        });
-    }
-
-    showAnimationParams(animation) {
-        const paramsContainer = document.getElementById('animation-params');
-        paramsContainer.innerHTML = '';
-
-        if (animation.params && Object.keys(animation.params).length > 0) {
-            Object.entries(animation.params).forEach(([key, param]) => {
-                const controlGroup = document.createElement('div');
-                controlGroup.className = 'control-group';
-
-                const label = document.createElement('label');
-                label.textContent = param.name || key;
-                controlGroup.appendChild(label);
-
-                let input;
-                if (param.type === 'range') {
-                    const controlRow = document.createElement('div');
-                    controlRow.className = 'control-row';
-
-                    input = document.createElement('input');
-                    input.type = 'range';
-                    input.min = param.min || 0;
-                    input.max = param.max || 100;
-                    input.value = param.default || 50;
-
-                    const valueDisplay = document.createElement('span');
-                    valueDisplay.className = 'value-display';
-                    valueDisplay.textContent = input.value;
-
-                    input.addEventListener('input', (e) => {
-                        valueDisplay.textContent = e.target.value;
-                        this.updateAnimationParam(key, parseFloat(e.target.value));
-                    });
-
-                    controlRow.appendChild(input);
-                    controlRow.appendChild(valueDisplay);
-                    controlGroup.appendChild(controlRow);
-                } else if (param.type === 'select') {
-                    input = document.createElement('select');
-                    param.options.forEach(option => {
-                        const optionElement = document.createElement('option');
-                        optionElement.value = option;
-                        optionElement.textContent = option;
-                        input.appendChild(optionElement);
-                    });
-                    input.value = param.default || param.options[0];
-                    controlGroup.appendChild(input);
-                } else {
-                    input = document.createElement('input');
-                    input.type = param.type || 'text';
-                    input.value = param.default || '';
-                    controlGroup.appendChild(input);
-                }
-
-                paramsContainer.appendChild(controlGroup);
-            });
-        } else {
-            paramsContainer.innerHTML = '<p>No configurable parameters</p>';
         }
     }
 
@@ -587,6 +554,18 @@ class LightBoxController {
         }
     }
 
+    async switchProgram(programName) {
+        try {
+            await fetch('/api/program', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ program: programName })
+            });
+        } catch (error) {
+            console.error('Error switching program:', error);
+        }
+    }
+
     handleBatchUpdate(data) {
         data.updates.forEach(([event, updateData]) => {
             switch (event) {
@@ -611,9 +590,9 @@ class LightBoxController {
     }
 }
 
-// Initialize when DOM is ready
+// Initialize the controller
 document.addEventListener('DOMContentLoaded', () => {
-    window.lightboxController = new LightBoxController();
+    new LightBoxController();
 });
 
 // Handle page unload

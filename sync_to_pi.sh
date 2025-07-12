@@ -93,10 +93,15 @@ ssh "$PI_USER@$PI_HOST" "cd $PI_PROJECT_DIR && python3 -m venv venv"
 
 # Install dependencies
 echo "📦 Installing Python dependencies..."
-ssh "$PI_USER@$PI_HOST" "cd $PI_PROJECT_DIR && source venv/bin/activate && pip install -r requirements.txt"
+ssh "$PI_USER@$PI_HOST" "cd $PI_PROJECT_DIR && source venv/bin/activate && pip install -r requirements-optimized.txt"
+
+# Install rgbmatrix library
+echo "🛠️ Installing rgbmatrix library..."
+ssh "$PI_USER@$PI_HOST" "cd $PI_PROJECT_DIR && sudo bash scripts/install_rgb_matrix.sh"
+
 
 echo ""
 echo "🎉 Sync complete! Next steps:"
 echo "   1. SSH to Pi: ssh pi@lightbox.local"
 echo "   2. Run setup: cd ~/LightBox_Organized && ./setup_lightbox_pi.sh"
-echo "   3. Or run directly: cd ~/LightBox_Organized && python3 main.py" 
+echo "   3. Or run directly: cd ~/LightBox_Organized && source venv/bin/activate && python3 main.py" 

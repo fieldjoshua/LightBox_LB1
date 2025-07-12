@@ -10,11 +10,10 @@ This is the main entry point that integrates all the building blocks:
 - Hardware management (buttons, OLED)
 - Performance monitoring and optimization
 """
-
+import logging
 import signal
 import sys
 import threading
-import logging
 from pathlib import Path
 
 # Add the current directory to Python path
@@ -23,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 # Import core components
 from core.conductor import Conductor
 from core.config import ConfigManager
-from web.app import create_app
+from api.WebAPI import create_app
 from hardware.hardware_manager import HardwareManager
 
 # Configure logging
@@ -61,7 +60,7 @@ class LightBoxController:
             logger.info("Initializing LightBox system...")
             
             # Initialize conductor (animation engine)
-            self.conductor = Conductor(self.config.config_path)
+            self.conductor = Conductor(self.config)
             if not self.conductor.initialize():
                 logger.error("Failed to initialize conductor")
                 return False
@@ -72,7 +71,7 @@ class LightBoxController:
             )
             
             # Initialize web application
-            self.web_app = create_app(self.conductor)
+            self.web_app, self.socketio = create_app(self.conductor)
             self.conductor.web_server = self.web_app
             
             logger.info("LightBox system initialization complete")
@@ -105,12 +104,13 @@ class LightBoxController:
             debug = self.config.get("web.debug", False)
             
             logger.info(f"Starting web server on {host}:{port}")
-            self.web_app.socketio.run(
+            self.socketio.run(
                 self.web_app,
                 host=host,
                 port=port,
                 debug=debug,
-                use_reloader=False
+                use_reloader=False,
+                allow_unsafe_werkzeug=True
             )
             
         except KeyboardInterrupt:
