@@ -1,0 +1,21 @@
+[Unit]
+Description=LightBox LED Matrix Controller
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/fieldjoshua/LightBox
+ExecStart=/home/fieldjoshua/LightBox/venv/bin/python3 /home/fieldjoshua/LightBox/CosmicLED.py
+Restart=on-failure
+RestartSec=10
+
+# Environment
+Environment="PYTHONUNBUFFERED=1"
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

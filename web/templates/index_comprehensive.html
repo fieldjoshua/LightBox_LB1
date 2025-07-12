@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LightBox Comprehensive Control</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --secondary: #8b5cf6;
+            --background: #0f172a;
+            --surface: #1e293b;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--background);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: var(--surface);
+            border-radius: 12px;
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .panel {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .panel h2 {
+            color: var(--primary);
+            margin-bottom: 20px;
+            font-size: 1.2em;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 8px;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--border);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            border: none;
+        }
+
+        .value-display {
+            min-width: 60px;
+            text-align: right;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        select {
+            width: 100%;
+            padding: 10px;
+            background: var(--background);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toggle input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+        }
+
+        .advanced-section {
+            border-top: 1px solid var(--border);
+            margin-top: 20px;
+            padding-top: 20px;
+        }
+
+        .collapsible {
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .collapsible::after {
+            content: "▼";
+            transition: transform 0.3s;
+        }
+
+        .collapsible.collapsed::after {
+            transform: rotate(-90deg);
+        }
+
+        .collapsible-content {
+            margin-top: 15px;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .metric {
+            text-align: center;
+            padding: 15px;
+            background: var(--background);
+            border-radius: 8px;
+        }
+
+        .metric-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .metric-label {
+            color: var(--text-muted);
+            font-size: 0.9em;
+        }
+
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .color-swatch {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+
+        .color-swatch.active {
+            border-color: var(--primary);
+        }
+
+        .btn {
+            padding: 10px 20px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+
+        .btn:hover {
+            background: var(--secondary);
+        }
+
+        .btn-secondary {
+            background: var(--border);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎨 LightBox Comprehensive Control</h1>
+            <div class="status">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Connected</span>
+            </div>
+        </div>
+
+        <!-- Performance Metrics -->
+        <div class="metrics">
+            <div class="metric">
+                <div class="metric-value" id="fps">--</div>
+                <div class="metric-label">FPS</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="cpu">--%</div>
+                <div class="metric-label">CPU</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="memory">-- MB</div>
+                <div class="metric-label">Memory</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="dropped">--%</div>
+                <div class="metric-label">Dropped</div>
+            </div>
+        </div>
+
+        <div class="grid">
+            <!-- Core Controls Panel -->
+            <div class="panel">
+                <h2>🎛️ Core Controls</h2>
+                
+                <div class="control-group">
+                    <label for="brightness">Brightness</label>
+                    <div class="slider-container">
+                        <input type="range" id="brightness" min="0" max="1" step="0.01" value="0.8">
+                        <span class="value-display" id="brightness-value">80%</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="speed">Speed</label>
+                    <div class="slider-container">
+                        <input type="range" id="speed" min="0.1" max="10" step="0.1" value="1.0">
+                        <span class="value-display" id="speed-value">1.0x</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="gamma">Gamma Correction</label>
+                    <div class="slider-container">
+                        <input type="range" id="gamma" min="1.0" max="3.0" step="0.1" value="2.2">
+                        <span class="value-display" id="gamma-value">2.2</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="intensity">Intensity</label>
+                    <div class="slider-container">
+                        <input type="range" id="intensity" min="0" max="2" step="0.01" value="1.0">
+                        <span class="value-display" id="intensity-value">100%</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="saturation">Saturation</label>
+                    <div class="slider-container">
+                        <input type="range" id="saturation" min="0" max="1" step="0.01" value="1.0">
+                        <span class="value-display" id="saturation-value">100%</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="hue_shift">Hue Shift</label>
+                    <div class="slider-container">
+                        <input type="range" id="hue_shift" min="0" max="1" step="0.01" value="0">
+                        <span class="value-display" id="hue_shift-value">0°</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="scale">Pattern Scale</label>
+                    <div class="slider-container">
+                        <input type="range" id="scale" min="0.1" max="10" step="0.1" value="1.0">
+                        <span class="value-display" id="scale-value">1.0x</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Animation Controls Panel -->
+            <div class="panel">
+                <h2>🌊 Animation Controls</h2>
+                
+                <div class="control-group">
+                    <label for="animation_program">Animation</label>
+                    <select id="animation_program">
+                        <option value="cosmic">Cosmic</option>
+                        <option value="aurora">Aurora</option>
+                        <option value="plasma">Plasma</option>
+                        <option value="waves">Waves</option>
+                        <option value="parametric_waves">Parametric Waves</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label for="wave_speed">Wave Speed</label>
+                    <div class="slider-container">
+                        <input type="range" id="wave_speed" min="0.01" max="1.0" step="0.01" value="0.05">
+                        <span class="value-display" id="wave_speed-value">0.05</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="color_speed">Color Speed</label>
+                    <div class="slider-container">
+                        <input type="range" id="color_speed" min="0.001" max="0.1" step="0.001" value="0.02">
+                        <span class="value-display" id="color_speed-value">0.02</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="wave_scale">Wave Scale</label>
+                    <div class="slider-container">
+                        <input type="range" id="wave_scale" min="0.1" max="2.0" step="0.1" value="0.3">
+                        <span class="value-display" id="wave_scale-value">0.3</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="transition_speed">Transition Speed</label>
+                    <div class="slider-container">
+                        <input type="range" id="transition_speed" min="0.1" max="5.0" step="0.1" value="1.0">
+                        <span class="value-display" id="transition_speed-value">1.0</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="complexity">Complexity</label>
+                    <div class="slider-container">
+                        <input type="range" id="complexity" min="1" max="10" step="1" value="5">
+                        <span class="value-display" id="complexity-value">5</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="density">Density</label>
+                    <div class="slider-container">
+                        <input type="range" id="density" min="0.1" max="1.0" step="0.1" value="1.0">
+                        <span class="value-display" id="density-value">100%</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="fade_rate">Fade Rate</label>
+                    <div class="slider-container">
+                        <input type="range" id="fade_rate" min="0.01" max="1.0" step="0.01" value="0.1">
+                        <span class="value-display" id="fade_rate-value">0.1</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Color & Palette Panel -->
+            <div class="panel">
+                <h2>🎨 Color & Palette</h2>
+                
+                <div class="control-group">
+                    <label for="color_palette">Color Palette</label>
+                    <select id="color_palette">
+                        <option value="rainbow">Rainbow</option>
+                        <option value="fire">Fire</option>
+                        <option value="ocean">Ocean</option>
+                        <option value="forest">Forest</option>
+                        <option value="sunset">Sunset</option>
+                        <option value="cosmic">Cosmic</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label for="color_temperature">Color Temperature</label>
+                    <div class="slider-container">
+                        <input type="range" id="color_temperature" min="2000" max="10000" step="100" value="6500">
+                        <span class="value-display" id="color_temperature-value">6500K</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="contrast">Contrast</label>
+                    <div class="slider-container">
+                        <input type="range" id="contrast" min="0.5" max="2.0" step="0.1" value="1.0">
+                        <span class="value-display" id="contrast-value">100%</span>
+                    </div>
+                </div>
+
+                <div class="color-grid" id="palettePreview">
+                    <!-- Color swatches will be populated here -->
+                </div>
+            </div>
+
+            <!-- Effects Panel -->
+            <div class="panel">
+                <h2>✨ Effects</h2>
+                
+                <div class="control-group">
+                    <label for="blur_radius">Blur Radius</label>
+                    <div class="slider-container">
+                        <input type="range" id="blur_radius" min="0" max="10" step="1" value="0">
+                        <span class="value-display" id="blur_radius-value">0</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="vignette">Vignette</label>
+                    <div class="slider-container">
+                        <input type="range" id="vignette" min="0" max="1" step="0.01" value="0">
+                        <span class="value-display" id="vignette-value">0%</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="edge_fade">Edge Fade</label>
+                    <div class="slider-container">
+                        <input type="range" id="edge_fade" min="0" max="1" step="0.01" value="0">
+                        <span class="value-display" id="edge_fade-value">0%</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="noise_amount">Noise Amount</label>
+                    <div class="slider-container">
+                        <input type="range" id="noise_amount" min="0" max="1" step="0.01" value="0">
+                        <span class="value-display" id="noise_amount-value">0%</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="motion_blur">Motion Blur</label>
+                    <div class="slider-container">
+                        <input type="range" id="motion_blur" min="0" max="1" step="0.01" value="0">
+                        <span class="value-display" id="motion_blur-value">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- HUB75 Hardware Panel -->
+            <div class="panel">
+                <h2>🔧 HUB75 Hardware</h2>
+                
+                <div class="advanced-section">
+                    <div class="collapsible" onclick="toggleSection('hub75Basic')">
+                        <span>Basic Settings</span>
+                    </div>
+                    <div class="collapsible-content" id="hub75Basic">
+                        <div class="control-group">
+                            <label for="hub75_pwm_bits">PWM Bits (Color Depth)</label>
+                            <div class="slider-container">
+                                <input type="range" id="hub75_pwm_bits" min="1" max="11" step="1" value="11">
+                                <span class="value-display" id="hub75_pwm_bits-value">11</span>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label for="hub75_gpio_slowdown">GPIO Slowdown</label>
+                            <div class="slider-container">
+                                <input type="range" id="hub75_gpio_slowdown" min="1" max="5" step="1" value="4">
+                                <span class="value-display" id="hub75_gpio_slowdown-value">4</span>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label for="hub75_scan_mode">Scan Mode</label>
+                            <select id="hub75_scan_mode">
+                                <option value="0">Progressive (0)</option>
+                                <option value="1">Interlaced (1)</option>
+                            </select>
+                        </div>
+
+                        <div class="control-group">
+                            <label for="hub75_row_address_type">Row Address Type</label>
+                            <select id="hub75_row_address_type">
+                                <option value="0">Direct (0)</option>
+                                <option value="1">ABC (1)</option>
+                                <option value="2">ABCD (2)</option>
+                                <option value="3">ABCDE (3)</option>
+                            </select>
+                        </div>
+
+                        <div class="control-group">
+                            <label for="hub75_multiplexing">Multiplexing</label>
+                            <div class="slider-container">
+                                <input type="range" id="hub75_multiplexing" min="0" max="17" step="1" value="0">
+                                <span class="value-display" id="hub75_multiplexing-value">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="advanced-section">
+                    <div class="collapsible collapsed" onclick="toggleSection('hub75Advanced')">
+                        <span>Advanced Settings</span>
+                    </div>
+                    <div class="collapsible-content" id="hub75Advanced" style="display: none;">
+                        <div class="control-group">
+                            <label for="hub75_pwm_lsb_nanoseconds">PWM LSB Nanoseconds</label>
+                            <div class="slider-container">
+                                <input type="range" id="hub75_pwm_lsb_nanoseconds" min="50" max="3000" step="10" value="130">
+                                <span class="value-display" id="hub75_pwm_lsb_nanoseconds-value">130ns</span>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label for="hub75_limit_refresh">Refresh Rate Limit</label>
+                            <div class="slider-container">
+                                <input type="range" id="hub75_limit_refresh" min="0" max="1000" step="10" value="0">
+                                <span class="value-display" id="hub75_limit_refresh-value">0 Hz</span>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="toggle">
+                                <input type="checkbox" id="hub75_hardware_pwm">
+                                <label for="hub75_hardware_pwm">Hardware PWM</label>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="toggle">
+                                <input type="checkbox" id="hub75_cpu_isolation">
+                                <label for="hub75_cpu_isolation">CPU Isolation</label>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="toggle">
+                                <input type="checkbox" id="hub75_show_refresh_rate">
+                                <label for="hub75_show_refresh_rate">Show Refresh Rate</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance Panel -->
+            <div class="panel">
+                <h2>⚡ Performance</h2>
+                
+                <div class="control-group">
+                    <label for="target_fps">Target FPS</label>
+                    <div class="slider-container">
+                        <input type="range" id="target_fps" min="15" max="60" step="1" value="30">
+                        <span class="value-display" id="target_fps-value">30</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <div class="toggle">
+                        <input type="checkbox" id="enable_caching" checked>
+                        <label for="enable_caching">Enable Caching</label>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="cache_size">Cache Size</label>
+                    <div class="slider-container">
+                        <input type="range" id="cache_size" min="100" max="10000" step="100" value="1000">
+                        <span class="value-display" id="cache_size-value">1000</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="buffer_pool_size">Buffer Pool Size</label>
+                    <div class="slider-container">
+                        <input type="range" id="buffer_pool_size" min="2" max="10" step="1" value="3">
+                        <span class="value-display" id="buffer_pool_size-value">3</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <div class="toggle">
+                        <input type="checkbox" id="enable_profiling">
+                        <label for="enable_profiling">Enable Profiling</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced/Custom Panel -->
+            <div class="panel">
+                <h2>🔬 Advanced</h2>
+                
+                <div class="control-group">
+                    <label>Raw JSON Configuration</label>
+                    <textarea id="raw_config" rows="8" style="width: 100%; background: var(--background); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-family: monospace;">
+{
+  "brightness": 0.8,
+  "speed": 1.0,
+  "gamma": 2.2
+}
+                    </textarea>
+                </div>
+
+                <div style="text-align: center; margin-top: 20px;">
+                    <button class="btn" onclick="applyRawConfig()">Apply Raw Config</button>
+                    <button class="btn btn-secondary" onclick="exportConfig()">Export Config</button>
+                    <button class="btn btn-secondary" onclick="resetToDefaults()">Reset Defaults</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let isConnected = false;
+        
+        // Initialize the interface
+        function init() {
+            updateAllValues();
+            connectWebSocket();
+            setupEventListeners();
+            loadStatus();
+        }
+
+        // Setup event listeners for all controls
+        function setupEventListeners() {
+            // Core controls
+            ['brightness', 'speed', 'gamma', 'intensity', 'saturation', 'hue_shift', 'scale'].forEach(param => {
+                const slider = document.getElementById(param);
+                if (slider) {
+                    slider.addEventListener('input', () => updateParameter(param, slider.value));
+                }
+            });
+
+            // Animation controls
+            ['wave_speed', 'color_speed', 'wave_scale', 'transition_speed', 'complexity', 'density', 'fade_rate'].forEach(param => {
+                const slider = document.getElementById(param);
+                if (slider) {
+                    slider.addEventListener('input', () => updateParameter(param, slider.value));
+                }
+            });
+
+            // Effect controls
+            ['blur_radius', 'vignette', 'edge_fade', 'noise_amount', 'motion_blur'].forEach(param => {
+                const slider = document.getElementById(param);
+                if (slider) {
+                    slider.addEventListener('input', () => updateParameter(param, slider.value));
+                }
+            });
+
+            // HUB75 controls
+            ['hub75_pwm_bits', 'hub75_gpio_slowdown', 'hub75_multiplexing', 'hub75_pwm_lsb_nanoseconds', 'hub75_limit_refresh'].forEach(param => {
+                const slider = document.getElementById(param);
+                if (slider) {
+                    slider.addEventListener('input', () => updateParameter(param.replace('hub75_', 'hub75.'), slider.value));
+                }
+            });
+
+            // Select controls
+            ['animation_program', 'color_palette', 'hub75_scan_mode', 'hub75_row_address_type'].forEach(param => {
+                const select = document.getElementById(param);
+                if (select) {
+                    select.addEventListener('change', () => updateParameter(param.replace('hub75_', 'hub75.'), select.value));
+                }
+            });
+
+            // Performance controls
+            ['target_fps', 'cache_size', 'buffer_pool_size'].forEach(param => {
+                const slider = document.getElementById(param);
+                if (slider) {
+                    slider.addEventListener('input', () => updateParameter(param, slider.value));
+                }
+            });
+
+            // Checkboxes
+            ['enable_caching', 'enable_profiling', 'hub75_hardware_pwm', 'hub75_cpu_isolation', 'hub75_show_refresh_rate'].forEach(param => {
+                const checkbox = document.getElementById(param);
+                if (checkbox) {
+                    checkbox.addEventListener('change', () => updateParameter(param.replace('hub75_', 'hub75.'), checkbox.checked));
+                }
+            });
+        }
+
+        // Update parameter value
+        function updateParameter(param, value) {
+            // Update display
+            updateValueDisplay(param, value);
+            
+            // Send to API
+            fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [param]: parseValue(value) })
+            }).catch(console.error);
+        }
+
+        // Parse value based on type
+        function parseValue(value) {
+            if (value === 'true') return true;
+            if (value === 'false') return false;
+            if (!isNaN(value)) return Number(value);
+            return value;
+        }
+
+        // Update value displays
+        function updateValueDisplay(param, value) {
+            const displayId = param.replace('.', '_') + '-value';
+            const display = document.getElementById(displayId);
+            if (!display) return;
+
+            let formatted = value;
+            if (param.includes('brightness') || param.includes('intensity') || param.includes('saturation')) {
+                formatted = Math.round(value * 100) + '%';
+            } else if (param.includes('temperature')) {
+                formatted = value + 'K';
+            } else if (param.includes('nanoseconds')) {
+                formatted = value + 'ns';
+            } else if (param.includes('refresh') && value > 0) {
+                formatted = value + ' Hz';
+            } else if (param.includes('hue_shift')) {
+                formatted = Math.round(value * 360) + '°';
+            }
+            
+            display.textContent = formatted;
+        }
+
+        // Update all value displays
+        function updateAllValues() {
+            document.querySelectorAll('input[type="range"]').forEach(slider => {
+                updateValueDisplay(slider.id, slider.value);
+            });
+        }
+
+        // Toggle collapsible sections
+        function toggleSection(sectionId) {
+            const content = document.getElementById(sectionId);
+            const trigger = content.previousElementSibling;
+            
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                trigger.classList.remove('collapsed');
+            } else {
+                content.style.display = 'none';
+                trigger.classList.add('collapsed');
+            }
+        }
+
+        // Load system status
+        function loadStatus() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('fps').textContent = data.performance?.fps || '--';
+                    document.getElementById('cpu').textContent = (data.performance?.cpu || 0) + '%';
+                    document.getElementById('memory').textContent = (data.performance?.memory || 0) + ' MB';
+                    document.getElementById('dropped').textContent = (data.performance?.dropped || 0) + '%';
+                    
+                    // Update connection status
+                    isConnected = true;
+                    document.getElementById('statusText').textContent = 'Connected';
+                    document.getElementById('statusDot').style.background = 'var(--success)';
+                })
+                .catch(() => {
+                    isConnected = false;
+                    document.getElementById('statusText').textContent = 'Disconnected';
+                    document.getElementById('statusDot').style.background = 'var(--error)';
+                });
+        }
+
+        // WebSocket connection for real-time updates
+        function connectWebSocket() {
+            // Fallback to polling if WebSocket not available
+            setInterval(loadStatus, 2000);
+        }
+
+        // Advanced functions
+        function applyRawConfig() {
+            try {
+                const config = JSON.parse(document.getElementById('raw_config').value);
+                fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                }).then(() => location.reload());
+            } catch (e) {
+                alert('Invalid JSON configuration');
+            }
+        }
+
+        function exportConfig() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    const blob = new Blob([JSON.stringify(data.config, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'lightbox-config.json';
+                    a.click();
+                });
+        }
+
+        function resetToDefaults() {
+            if (confirm('Reset all parameters to defaults?')) {
+                fetch('/api/config/reset', { method: 'POST' })
+                    .then(() => location.reload());
+            }
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

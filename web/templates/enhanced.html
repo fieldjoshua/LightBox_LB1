@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LightBox Enhanced Control Panel</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <style>
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #333;
+            margin-bottom: 20px;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: #2a2a2a;
+            border: none;
+            color: #fff;
+            margin-right: 2px;
+        }
+        
+        .tab.active {
+            background: #444;
+            border-bottom: 2px solid #00ff88;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .file-manager {
+            border: 1px solid #333;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        
+        .file-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #555;
+            padding: 10px;
+            background: #1a1a1a;
+        }
+        
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px;
+            border-bottom: 1px solid #333;
+        }
+        
+        .file-item:hover {
+            background: #333;
+        }
+        
+        .terminal {
+            background: #000;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #333;
+            white-space: pre-wrap;
+        }
+        
+        .parameter-group {
+            border: 1px solid #333;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        
+        .upload-area {
+            border: 2px dashed #333;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-area:hover,
+        .upload-area.dragover {
+            border-color: #00ff88;
+            background: rgba(0, 255, 136, 0.1);
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .status-card {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 3px solid #00ff88;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎨 LightBox Enhanced Control Panel</h1>
+            <div class="status-bar">
+                <span id="connection-status" class="status-indicator">⚫ Disconnected</span>
+                <span id="fps-counter">0 FPS</span>
+                <span id="uptime">Uptime: 0s</span>
+                <span id="ws-status">🔌 WebSocket: Disconnected</span>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('control')">Control</button>
+            <button class="tab" onclick="showTab('files')">File Manager</button>
+            <button class="tab" onclick="showTab('programs')">Program Parameters</button>
+            <button class="tab" onclick="showTab('terminal')">Terminal Monitor</button>
+        </div>
+
+        <!-- Control Tab -->
+        <div id="control-tab" class="tab-content active">
+            <!-- Program Selection -->
+            <section class="control-section">
+                <h2>Animation Program</h2>
+                <div class="program-selector">
+                    <select id="program-select" class="control-select">
+                        <option value="cosmic">Cosmic</option>
+                    </select>
+                    <button id="switch-program" class="btn btn-primary">Switch Program</button>
+                </div>
+            </section>
+
+            <!-- Animation Controls -->
+            <section class="control-section">
+                <h2>Animation Settings</h2>
+                <div class="controls-grid">
+                    <div class="control-group">
+                        <label for="brightness">Brightness</label>
+                        <input type="range" id="brightness" min="0" max="1" step="0.01" value="0.5">
+                        <span class="value-display" id="brightness-value">50%</span>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="speed">Speed</label>
+                        <input type="range" id="speed" min="0.1" max="5" step="0.1" value="1">
+                        <span class="value-display" id="speed-value">1.0x</span>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="scale">Scale</label>
+                        <input type="range" id="scale" min="0.1" max="5" step="0.1" value="1">
+                        <span class="value-display" id="scale-value">1.0x</span>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="intensity">Intensity</label>
+                        <input type="range" id="intensity" min="0" max="2" step="0.1" value="1">
+                        <span class="value-display" id="intensity-value">1.0x</span>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="gamma">Gamma</label>
+                        <input type="range" id="gamma" min="1" max="3" step="0.1" value="2.2">
+                        <span class="value-display" id="gamma-value">2.2</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Color Palette -->
+            <section class="control-section">
+                <h2>Color Palette</h2>
+                <div class="palette-selector">
+                    <select id="palette-select" class="control-select">
+                        <option value="rainbow">Rainbow</option>
+                        <option value="fire">Fire</option>
+                        <option value="ocean">Ocean</option>
+                        <option value="forest">Forest</option>
+                        <option value="sunset">Sunset</option>
+                        <option value="monochrome">Monochrome</option>
+                    </select>
+                    <button id="apply-palette" class="btn btn-primary">Apply Palette</button>
+                </div>
+                <div id="palette-preview" class="palette-preview"></div>
+            </section>
+
+            <!-- Live Stats -->
+            <section class="control-section">
+                <h2>Live Statistics</h2>
+                <div class="status-grid">
+                    <div class="status-card">
+                        <h3>Frame Count</h3>
+                        <span class="stat-value" id="frame-count">0</span>
+                    </div>
+                    <div class="status-card">
+                        <h3>Current Program</h3>
+                        <span class="stat-value" id="current-program">-</span>
+                    </div>
+                    <div class="status-card">
+                        <h3>LED Count</h3>
+                        <span class="stat-value" id="led-count">100</span>
+                    </div>
+                    <div class="status-card">
+                        <h3>Last Update</h3>
+                        <span class="stat-value" id="last-update">-</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- File Manager Tab -->
+        <div id="files-tab" class="tab-content">
+            <section class="control-section">
+                <h2>File Manager</h2>
+                
+                <!-- Upload Area -->
+                <div class="upload-area" id="upload-area">
+                    <h3>📁 Drop Files Here or Click to Upload</h3>
+                    <p>Supported: .py, .json, .txt, .md files</p>
+                    <input type="file" id="file-upload" multiple accept=".py,.json,.txt,.md" style="display: none;">
+                    
+                    <div class="btn-group">
+                        <select id="upload-type">
+                            <option value="scripts">Scripts</option>
+                            <option value="presets">Presets</option>
+                            <option value="config">Config</option>
+                        </select>
+                        <button id="select-files-btn" class="btn btn-primary">Select Files</button>
+                    </div>
+                </div>
+
+                <!-- File Lists -->
+                <div class="file-manager">
+                    <h3>Scripts</h3>
+                    <div class="file-list" id="scripts-list"></div>
+                </div>
+
+                <div class="file-manager">
+                    <h3>Presets</h3>
+                    <div class="file-list" id="presets-list"></div>
+                </div>
+
+                <div class="file-manager">
+                    <h3>Config Files</h3>
+                    <div class="file-list" id="config-list"></div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Program Parameters Tab -->
+        <div id="programs-tab" class="tab-content">
+            <section class="control-section">
+                <h2>Program Parameters</h2>
+                <div class="parameter-group">
+                    <select id="param-program-select" class="control-select">
+                        <option value="">Select a program...</option>
+                    </select>
+                    <button id="load-parameters" class="btn btn-primary">Load Parameters</button>
+                </div>
+                
+                <div id="program-parameters" class="parameter-group">
+                    <p>Select a program to view its configurable parameters.</p>
+                </div>
+            </section>
+        </div>
+
+        <!-- Terminal Monitor Tab -->
+        <div id="terminal-tab" class="tab-content">
+            <section class="control-section">
+                <h2>Terminal Monitor</h2>
+                <div class="btn-group">
+                    <button id="clear-terminal" class="btn btn-secondary">Clear</button>
+                    <button id="toggle-auto-scroll" class="btn btn-secondary">Auto-scroll: ON</button>
+                </div>
+                <div id="terminal" class="terminal">
+                    Connecting to terminal stream...
+                </div>
+            </section>
+        </div>
+
+        <footer>
+            <p>LightBox Enhanced LED Matrix Controller | Running on Raspberry Pi</p>
+        </footer>
+    </div>
+
+    <script>
+        // Global state
+        let isConnected = false;
+        let currentConfig = {};
+        let socket = null;
+        let autoScroll = true;
+
+        // Tab management
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            document.querySelector(`[onclick="showTab('${tabName}')"]`).classList.add('active');
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+        }
+
+        // Socket.IO connection
+        function connectWebSocket() {
+            socket = io();
+            
+            socket.on('connect', () => {
+                document.getElementById('ws-status').textContent = '🟢 WebSocket: Connected';
+                socket.emit('subscribe_terminal');
+            });
+            
+            socket.on('disconnect', () => {
+                document.getElementById('ws-status').textContent = '🔴 WebSocket: Disconnected';
+            });
+            
+            socket.on('terminal_output', (data) => {
+                if (data.data) {
+                    const terminal = document.getElementById('terminal');
+                    data.data.forEach(output => {
+                        const timestamp = new Date(output.timestamp * 1000).toLocaleTimeString();
+                        terminal.textContent += `[${timestamp}] ${output.content}`;
+                    });
+                    
+                    if (autoScroll) {
+                        terminal.scrollTop = terminal.scrollHeight;
+                    }
+                }
+            });
+        }
+
+        // Update status indicator
+        function updateConnectionStatus(connected) {
+            const indicator = document.getElementById('connection-status');
+            if (connected) {
+                indicator.textContent = '🟢 Connected';
+                indicator.classList.add('connected');
+            } else {
+                indicator.textContent = '⚫ Disconnected';
+                indicator.classList.remove('connected');
+            }
+            isConnected = connected;
+        }
+
+        // Fetch current status
+        async function fetchStatus() {
+            try {
+                const response = await fetch('/api/status');
+                if (response.ok) {
+                    const data = await response.json();
+                    updateConnectionStatus(true);
+                    updateUI(data);
+                } else {
+                    updateConnectionStatus(false);
+                }
+            } catch (error) {
+                updateConnectionStatus(false);
+                console.error('Error fetching status:', error);
+            }
+        }
+
+        // Update UI with status data
+        function updateUI(data) {
+            if (data.stats) {
+                document.getElementById('fps-counter').textContent = `${data.stats.fps} FPS`;
+                document.getElementById('uptime').textContent = `Uptime: ${formatUptime(data.stats.uptime)}`;
+                document.getElementById('frame-count').textContent = data.stats.frame_count;
+                document.getElementById('current-program').textContent = data.stats.current_program;
+                document.getElementById('last-update').textContent = new Date(data.stats.last_update).toLocaleTimeString();
+            }
+
+            if (data.config) {
+                currentConfig = data.config;
+                document.getElementById('brightness').value = data.config.brightness;
+                document.getElementById('brightness-value').textContent = `${Math.round(data.config.brightness * 100)}%`;
+                
+                document.getElementById('speed').value = data.config.speed;
+                document.getElementById('speed-value').textContent = `${data.config.speed}x`;
+                
+                document.getElementById('scale').value = data.config.scale;
+                document.getElementById('scale-value').textContent = `${data.config.scale}x`;
+                
+                document.getElementById('intensity').value = data.config.intensity;
+                document.getElementById('intensity-value').textContent = `${data.config.intensity}x`;
+                
+                document.getElementById('gamma').value = data.config.gamma;
+                document.getElementById('gamma-value').textContent = data.config.gamma;
+                
+                document.getElementById('led-count').textContent = data.config.led_count;
+                document.getElementById('palette-select').value = data.config.current_palette;
+            }
+
+            if (data.programs) {
+                const select = document.getElementById('program-select');
+                const paramSelect = document.getElementById('param-program-select');
+                
+                [select, paramSelect].forEach(selectEl => {
+                    const currentValue = selectEl.value;
+                    selectEl.innerHTML = '';
+                    
+                    if (selectEl === paramSelect) {
+                        selectEl.innerHTML = '<option value="">Select a program...</option>';
+                    }
+                    
+                    data.programs.forEach(program => {
+                        const option = document.createElement('option');
+                        option.value = program;
+                        option.textContent = program.charAt(0).toUpperCase() + program.slice(1);
+                        if (program === data.current_program && selectEl === select) {
+                            option.selected = true;
+                        }
+                        selectEl.appendChild(option);
+                    });
+                });
+            }
+        }
+
+        // Format uptime
+        function formatUptime(seconds) {
+            if (seconds < 60) return `${seconds}s`;
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            return `${hours}h ${minutes}m`;
+        }
+
+        // File management functions
+        async function loadFiles() {
+            try {
+                const response = await fetch('/api/files');
+                if (response.ok) {
+                    const files = await response.json();
+                    
+                    ['scripts', 'presets', 'config'].forEach(type => {
+                        const listEl = document.getElementById(`${type}-list`);
+                        listEl.innerHTML = '';
+                        
+                        if (files[type]) {
+                            files[type].forEach(file => {
+                                const item = document.createElement('div');
+                                item.className = 'file-item';
+                                item.innerHTML = `
+                                    <span>📄 ${file.name} (${formatFileSize(file.size)})</span>
+                                    <div>
+                                        <button onclick="downloadFile('${type}/${file.name}')" class="btn btn-small">Download</button>
+                                        <button onclick="deleteFile('${type}/${file.name}')" class="btn btn-small btn-danger">Delete</button>
+                                    </div>
+                                `;
+                                listEl.appendChild(item);
+                            });
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading files:', error);
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1048576) return Math.round(bytes / 1024) + ' KB';
+            return Math.round(bytes / 1048576) + ' MB';
+        }
+
+        async function downloadFile(filepath) {
+            try {
+                const response = await fetch(`/api/files/${filepath}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Create download link
+                    const blob = new Blob([data.content], {type: 'text/plain'});
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = data.filename;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                }
+            } catch (error) {
+                console.error('Error downloading file:', error);
+            }
+        }
+
+        async function deleteFile(filepath) {
+            if (confirm(`Are you sure you want to delete ${filepath}?`)) {
+                try {
+                    const response = await fetch(`/api/files/${filepath}`, {method: 'DELETE'});
+                    if (response.ok) {
+                        loadFiles(); // Refresh file list
+                        fetchStatus(); // Refresh program list if script was deleted
+                    }
+                } catch (error) {
+                    console.error('Error deleting file:', error);
+                }
+            }
+        }
+
+        // File upload handling
+        function setupFileUpload() {
+            const uploadArea = document.getElementById('upload-area');
+            const fileInput = document.getElementById('file-upload');
+            
+            uploadArea.addEventListener('click', () => {
+                fileInput.click();
+            });
+            
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+            
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+            
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                
+                const files = Array.from(e.dataTransfer.files);
+                uploadFiles(files);
+            });
+            
+            fileInput.addEventListener('change', (e) => {
+                const files = Array.from(e.target.files);
+                uploadFiles(files);
+            });
+            
+            document.getElementById('select-files-btn').addEventListener('click', () => {
+                fileInput.click();
+            });
+        }
+
+        async function uploadFiles(files) {
+            const formData = new FormData();
+            const uploadType = document.getElementById('upload-type').value;
+            
+            files.forEach(file => {
+                formData.append('files', file);
+            });
+            formData.append('type', uploadType);
+            
+            try {
+                const response = await fetch('/api/upload-files', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Upload results:', data.results);
+                    
+                    // Show results
+                    const successCount = data.results.filter(r => r.status === 'success').length;
+                    const errorCount = data.results.filter(r => r.status === 'error').length;
+                    
+                    alert(`Upload complete: ${successCount} successful, ${errorCount} failed`);
+                    
+                    loadFiles(); // Refresh file list
+                    fetchStatus(); // Refresh program list
+                }
+            } catch (error) {
+                console.error('Error uploading files:', error);
+                alert('Upload failed');
+            }
+        }
+
+        // Program parameters
+        async function loadProgramParameters() {
+            const program = document.getElementById('param-program-select').value;
+            if (!program) return;
+            
+            try {
+                const response = await fetch(`/api/program-parameters/${program}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    displayParameters(data.parameters);
+                }
+            } catch (error) {
+                console.error('Error loading parameters:', error);
+            }
+        }
+
+        function displayParameters(parameters) {
+            const container = document.getElementById('program-parameters');
+            
+            if (Object.keys(parameters).length === 0) {
+                container.innerHTML = '<p>This program has no configurable parameters.</p>';
+                return;
+            }
+            
+            container.innerHTML = '<h3>Program Parameters</h3>';
+            
+            Object.entries(parameters).forEach(([name, param]) => {
+                const div = document.createElement('div');
+                div.className = 'control-group';
+                
+                let input = '';
+                if (param.type === 'float' || param.type === 'int') {
+                    const min = param.min || '0';
+                    const max = param.max || '10';
+                    const step = param.type === 'float' ? '0.1' : '1';
+                    input = `<input type="range" id="param-${name}" min="${min}" max="${max}" step="${step}" value="${param.default}">`;
+                } else {
+                    input = `<input type="text" id="param-${name}" value="${param.default}">`;
+                }
+                
+                div.innerHTML = `
+                    <label for="param-${name}">${name}</label>
+                    ${input}
+                    <span class="value-display" id="param-${name}-value">${param.default}</span>
+                    <p style="font-size: 12px; color: #888;">${param.description}</p>
+                `;
+                
+                container.appendChild(div);
+            });
+            
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = 'Save Parameters';
+            saveBtn.className = 'btn btn-primary';
+            saveBtn.onclick = saveParameters;
+            container.appendChild(saveBtn);
+        }
+
+        async function saveParameters() {
+            const program = document.getElementById('param-program-select').value;
+            const params = {};
+            
+            document.querySelectorAll('[id^="param-"]').forEach(input => {
+                if (input.id.endsWith('-value')) return;
+                const paramName = input.id.replace('param-', '');
+                params[paramName] = input.value;
+            });
+            
+            try {
+                const response = await fetch(`/api/program-parameters/${program}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(params)
+                });
+                
+                if (response.ok) {
+                    alert('Parameters saved successfully');
+                }
+            } catch (error) {
+                console.error('Error saving parameters:', error);
+            }
+        }
+
+        // Terminal functions
+        function clearTerminal() {
+            document.getElementById('terminal').textContent = '';
+        }
+
+        function toggleAutoScroll() {
+            autoScroll = !autoScroll;
+            document.getElementById('toggle-auto-scroll').textContent = `Auto-scroll: ${autoScroll ? 'ON' : 'OFF'}`;
+        }
+
+        // Setup range input handlers (same as before)
+        function setupRangeInputs() {
+            const rangeInputs = [
+                { id: 'brightness', key: 'BRIGHTNESS', format: v => `${Math.round(v * 100)}%` },
+                { id: 'speed', key: 'SPEED', format: v => `${v}x` },
+                { id: 'scale', key: 'SCALE', format: v => `${v}x` },
+                { id: 'intensity', key: 'INTENSITY', format: v => `${v}x` },
+                { id: 'gamma', key: 'GAMMA', format: v => v }
+            ];
+
+            rangeInputs.forEach(input => {
+                const element = document.getElementById(input.id);
+                const display = document.getElementById(`${input.id}-value`);
+                
+                element.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    display.textContent = input.format(value);
+                });
+                
+                element.addEventListener('change', (e) => {
+                    const value = parseFloat(e.target.value);
+                    updateConfig({ [input.key]: value });
+                });
+            });
+        }
+
+        // Send config update
+        async function updateConfig(config) {
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Config updated:', data);
+                }
+            } catch (error) {
+                console.error('Error updating config:', error);
+            }
+        }
+
+        // Switch program
+        document.getElementById('switch-program').addEventListener('click', async () => {
+            const program = document.getElementById('program-select').value;
+            try {
+                const response = await fetch('/api/program', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ program })
+                });
+                
+                if (response.ok) {
+                    console.log('Program switched to:', program);
+                }
+            } catch (error) {
+                console.error('Error switching program:', error);
+            }
+        });
+
+        // Apply palette
+        document.getElementById('apply-palette').addEventListener('click', async () => {
+            const palette = document.getElementById('palette-select').value;
+            try {
+                const response = await fetch('/api/palette', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ palette })
+                });
+                
+                if (response.ok) {
+                    console.log('Palette applied:', palette);
+                }
+            } catch (error) {
+                console.error('Error applying palette:', error);
+            }
+        });
+
+        // Event listeners
+        document.getElementById('load-parameters').addEventListener('click', loadProgramParameters);
+        document.getElementById('clear-terminal').addEventListener('click', clearTerminal);
+        document.getElementById('toggle-auto-scroll').addEventListener('click', toggleAutoScroll);
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            setupRangeInputs();
+            setupFileUpload();
+            connectWebSocket();
+            
+            // Start polling for status
+            fetchStatus();
+            setInterval(fetchStatus, 2000);
+            
+            // Load files
+            loadFiles();
+        });
+    </script>
+</body>
+</html>
