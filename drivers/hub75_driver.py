@@ -13,7 +13,9 @@ This driver implements best practices from Henner Zeller's rpi-rgb-led-matrix li
 import logging
 import time
 import os
+import sys
 from typing import Tuple, List, Union, Optional
+from pathlib import Path
 from .matrix_driver import MatrixDriver
 
 logger = logging.getLogger(__name__)
@@ -25,11 +27,15 @@ except ImportError:
     RGB_MATRIX_AVAILABLE = False
     logger.warning("rgbmatrix library not available - install with install_rgb_matrix.sh")
 
+# Import hardware detection utilities
 try:
-    import RPi.GPIO as GPIO
-    GPIO_AVAILABLE = True
+    # Add parent directory to path for local imports
+    sys.path.append(str(Path(__file__).parent.parent))
+    from scripts.util.hardware_detect import detect_hardware_pwm, check_cpu_isolation, get_system_info
+    HARDWARE_DETECT_AVAILABLE = True
 except ImportError:
-    GPIO_AVAILABLE = False
+    HARDWARE_DETECT_AVAILABLE = False
+    logger.warning("Hardware detection utilities not available")
 
 
 class HUB75Driver(MatrixDriver):
@@ -48,6 +54,7 @@ class HUB75Driver(MatrixDriver):
         self.hub_config = hub_config
         self.matrix = None
         self.canvas = None
+        self.refresh_rate = 0
         
         # Graphics module for text/shapes (optional)
         self.graphics = None
@@ -70,7 +77,7 @@ class HUB75Driver(MatrixDriver):
             options.cols = self.hub_config.get("cols", 64)
             options.chain_length = self.hub_config.get("chain_length", 1)
             options.parallel = self.hub_config.get("parallel", 1)
-            options.hardware_mapping = 'adafruit-hat'  # Adafruit HAT/Bonnet
+            options.hardware_mapping = self.hub_config.get("hardware_mapping", 'adafruit-hat')
             
             # Critical performance settings from optimization guide
             # -----------------------------------------------------
@@ -90,18 +97,29 @@ class HUB75Driver(MatrixDriver):
             # - Higher values: More stable but slower refresh
             options.pwm_lsb_nanoseconds = self.hub_config.get("pwm_lsb_nanoseconds", 130)
             
+            # pwm_dither_bits: Improves color smoothness through dithering
+            # - Higher values (1-2): Better color accuracy but may introduce noise
+            # - 0: No dithering (default)
+            options.pwm_dither_bits = self.hub_config.get("pwm_dither_bits", 0)
+            
             # Set brightness (0-100%)
             options.brightness = int(self.config.get("brightness", 0.8) * 100)
             
             # Show refresh rate for debugging
-            options.show_refresh_rate = self.config.get("performance", {}).get("show_refresh_rate", False)
+            options.show_refresh_rate = self.hub_config.get("show_refresh_rate", False)
             
             # Enable hardware PWM if GPIO4-GPIO18 jumper is soldered
             # -----------------------------------------------------
             # Hardware PWM eliminates flicker by using hardware pulse generation
             # This requires physically soldering a jumper between GPIO4 and GPIO18
             # Without this jumper, software PWM is used which can cause flickering lines
-            if self._detect_hardware_pwm():
+            hardware_pwm_setting = self.hub_config.get("hardware_pwm", "auto")
+            hardware_pwm_mod = self.config.get("hardware", {}).get("hardware_pwm_mod", False)
+            
+            # Detect hardware PWM using our utility
+            hardware_pwm_detected = self._detect_hardware_pwm()
+            
+            if hardware_pwm_setting == "on" or (hardware_pwm_setting == "auto" and (hardware_pwm_mod or hardware_pwm_detected)):
                 options.disable_hardware_pulsing = False
                 logger.info("Hardware PWM enabled - eliminates flicker!")
             else:
@@ -113,7 +131,7 @@ class HUB75Driver(MatrixDriver):
             # Setting a fixed refresh rate can stabilize animations under load
             # 0 = no limit (maximum possible refresh rate)
             # 120 = limit to 120 Hz (good balance for Pi 3B+)
-            limit_refresh = self.hub_config.get("limit_refresh", 0)
+            limit_refresh = self.hub_config.get("limit_refresh", 120)
             if limit_refresh > 0:
                 options.limit_refresh_rate_hz = limit_refresh
                 logger.info(f"Refresh rate limited to {limit_refresh} Hz")
@@ -132,14 +150,24 @@ class HUB75Driver(MatrixDriver):
             # On multi-core Pis (3B+/4), dedicating a CPU core to the matrix
             # significantly improves performance and stability
             # Add 'isolcpus=3' to /boot/cmdline.txt to enable
-            if self._check_cpu_isolation():
-                logger.info("CPU isolation detected - core 3 dedicated to matrix")
-            else:
-                logger.warning("CPU isolation not enabled - add 'isolcpus=3' to /boot/cmdline.txt")
+            cpu_isolation_enabled = self.config.get("performance", {}).get("cpu_isolation", True)
+            cpu_isolation_detected = self._check_cpu_isolation()
+            
+            if cpu_isolation_enabled:
+                if cpu_isolation_detected:
+                    logger.info("CPU isolation detected - core 3 dedicated to matrix")
+                else:
+                    logger.warning("CPU isolation requested but not detected - add 'isolcpus=3' to /boot/cmdline.txt")
             
             # Create matrix
             self.matrix = RGBMatrix(options=options)
             self.canvas = self.matrix.CreateFrameCanvas()
+            
+            # Get refresh rate if available
+            if hasattr(self.matrix, 'refresh_rate'):
+                self.refresh_rate = self.matrix.refresh_rate
+            elif hasattr(self.matrix, 'led_refresh_rate'):
+                self.refresh_rate = self.matrix.led_refresh_rate
             
             # Try to load graphics module for text support
             try:
@@ -150,7 +178,9 @@ class HUB75Driver(MatrixDriver):
                 font_paths = [
                     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
                     "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-                    "../../../fonts/7x13.bdf"  # From rgbmatrix samples
+                    "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+                    "../../../fonts/7x13.bdf",  # From rgbmatrix samples
+                    "fonts/7x13.bdf"
                 ]
                 for font_path in font_paths:
                     if os.path.exists(font_path):
@@ -158,10 +188,10 @@ class HUB75Driver(MatrixDriver):
                             self.font.LoadFont(font_path)
                             logger.info(f"Loaded font: {font_path}")
                             break
-                        except:
-                            pass
-            except:
-                logger.warning("Graphics module not available for text rendering")
+                        except Exception as e:
+                            logger.debug(f"Failed to load font {font_path}: {e}")
+            except Exception as e:
+                logger.warning(f"Graphics module not available for text rendering: {e}")
             
             # Clear display
             self.canvas.Clear()
@@ -177,51 +207,73 @@ class HUB75Driver(MatrixDriver):
     def _detect_hardware_pwm(self) -> bool:
         """Check if GPIO4-GPIO18 jumper is connected for hardware PWM.
         
-        The hardware PWM jumper connects GPIO4 to GPIO18, enabling hardware
-        pulse generation instead of software PWM. This eliminates flicker
-        and horizontal line artifacts common with software PWM.
+        Uses the hardware_detect utility if available, otherwise falls back
+        to basic detection.
         """
-        if not GPIO_AVAILABLE:
-            return False
+        if HARDWARE_DETECT_AVAILABLE:
+            return detect_hardware_pwm()
             
+        # Fallback to a basic check
         try:
-            # Save current GPIO state
+            import RPi.GPIO as GPIO
             GPIO.setmode(GPIO.BCM)
             GPIO.setwarnings(False)
             
-            # Configure pins
             GPIO.setup(4, GPIO.OUT)
             GPIO.setup(18, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
             
-            # Test connection
             GPIO.output(4, GPIO.HIGH)
             time.sleep(0.001)
             connected = GPIO.input(18) == GPIO.HIGH
             GPIO.output(4, GPIO.LOW)
             
-            # Cleanup
             GPIO.cleanup([4, 18])
-            
             return connected
             
         except Exception as e:
             logger.debug(f"Hardware PWM detection failed: {e}")
+            # If we can't detect, assume it's not connected
             return False
     
     def _check_cpu_isolation(self) -> bool:
         """Check if CPU isolation is enabled (isolcpus=3).
         
-        CPU isolation reserves a dedicated core for the LED matrix update thread,
-        preventing system processes from interrupting the display refresh.
-        This significantly improves performance and reduces flicker on
-        multi-core Raspberry Pi models (3B+, 4).
+        Uses the hardware_detect utility if available, otherwise falls back
+        to basic detection.
         """
+        if HARDWARE_DETECT_AVAILABLE:
+            return check_cpu_isolation()
+            
+        # Fallback to basic check
         try:
             with open('/proc/cmdline', 'r') as f:
                 cmdline = f.read()
                 return 'isolcpus=3' in cmdline
-        except:
+        except Exception as e:
+            logger.debug(f"CPU isolation check failed: {e}")
             return False
+    
+    def get_hardware_status(self) -> dict:
+        """Get hardware status information.
+        
+        Returns:
+            dict: Hardware status information
+        """
+        status = {
+            "hardware_pwm": self._detect_hardware_pwm(),
+            "cpu_isolation": self._check_cpu_isolation(),
+            "refresh_rate": self.refresh_rate
+        }
+        
+        # Add more detailed info if hardware_detect is available
+        if HARDWARE_DETECT_AVAILABLE:
+            try:
+                system_info = get_system_info()
+                status.update(system_info)
+            except Exception as e:
+                logger.debug(f"Failed to get system info: {e}")
+                
+        return status
     
     def update(self, frame_buffer: Union[List[Tuple[int, int, int]], bytearray]) -> None:
         """Update using hardware double buffering with SwapOnVSync.
@@ -259,76 +311,70 @@ class HUB75Driver(MatrixDriver):
                         self.canvas.SetPixel(x, y, r, g, b)
                         idx += 1
         
-        # Hardware accelerated buffer swap - key to smooth animation!
-        # This is the SwapOnVSync() that ensures tear-free updates
+        # Swap the buffer - this is the critical operation for tear-free animation
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
     
     def set_pixel(self, x: int, y: int, r: int, g: int, b: int) -> None:
-        """Set a single pixel."""
+        """Set a single pixel on the off-screen canvas."""
         if self.canvas and 0 <= x < self.width and 0 <= y < self.height:
             self.canvas.SetPixel(x, y, r, g, b)
     
     def fill(self, r: int, g: int, b: int) -> None:
-        """Fill entire matrix with a single color."""
-        if not self.canvas:
-            return
+        """Fill the entire display with a single color."""
+        if self.canvas:
+            for y in range(self.height):
+                for x in range(self.width):
+                    self.canvas.SetPixel(x, y, r, g, b)
             
-        for y in range(self.height):
-            for x in range(self.width):
-                self.canvas.SetPixel(x, y, r, g, b)
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
     
     def clear(self) -> None:
-        """Clear the matrix."""
+        """Clear the display (set all pixels to black)."""
         if self.canvas:
             self.canvas.Clear()
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
     
     def show(self) -> None:
-        """Update the physical display (swap buffers)."""
+        """Update the display with the current canvas."""
         if self.matrix and self.canvas:
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
     
     def set_brightness(self, brightness: float) -> None:
-        """Set global brightness."""
-        self._brightness = max(0.0, min(1.0, brightness))
-        
+        """Set display brightness (0.0-1.0)."""
         if self.matrix:
-            # Convert to percentage (0-100)
-            brightness_percent = int(self._brightness * 100)
-            self.matrix.brightness = brightness_percent
-            logger.debug(f"HUB75 brightness set to {brightness_percent}%")
+            # rgbmatrix brightness is 0-100
+            brightness_int = max(0, min(100, int(brightness * 100)))
+            self.matrix.brightness = brightness_int
+            logger.debug(f"Brightness set to {brightness_int}%")
     
     def draw_text(self, text: str, x: int, y: int, color: Tuple[int, int, int] = (255, 255, 255)) -> int:
-        """Draw text using graphics module if available.
+        """Draw text on the canvas using loaded font."""
+        if not self.graphics or not self.font or not self.canvas:
+            return 0
+            
+        # Create RGB color
+        rgb_color = self.graphics.Color(color[0], color[1], color[2])
         
-        Returns:
-            int: Width of rendered text in pixels
-        """
-        if self.graphics and self.font and self.canvas:
-            text_color = self.graphics.Color(*color)
-            return self.graphics.DrawText(self.canvas, self.font, x, y, text_color, text)
-        return 0
+        # Draw text to canvas and return length
+        return self.graphics.DrawText(self.canvas, self.font, x, y, rgb_color, text)
     
     def draw_line(self, x0: int, y0: int, x1: int, y1: int, color: Tuple[int, int, int]):
-        """Draw a line using graphics module if available."""
-        if self.graphics and self.canvas:
-            line_color = self.graphics.Color(*color)
-            self.graphics.DrawLine(self.canvas, x0, y0, x1, y1, line_color)
+        """Draw a line between two points."""
+        if not self.graphics or not self.canvas:
+            return
+            
+        rgb_color = self.graphics.Color(color[0], color[1], color[2])
+        self.graphics.DrawLine(self.canvas, x0, y0, x1, y1, rgb_color)
     
     def draw_circle(self, x: int, y: int, radius: int, color: Tuple[int, int, int]):
-        """Draw a circle using graphics module if available."""
-        if self.graphics and self.canvas:
-            circle_color = self.graphics.Color(*color)
-            self.graphics.DrawCircle(self.canvas, x, y, radius, circle_color)
+        """Draw a circle with center (x,y) and radius."""
+        if not self.graphics or not self.canvas:
+            return
+            
+        rgb_color = self.graphics.Color(color[0], color[1], color[2])
+        self.graphics.DrawCircle(self.canvas, x, y, radius, rgb_color)
     
     def cleanup(self) -> None:
-        """Clean up resources and turn off display."""
-        if self.matrix:
-            # Clear display
-            if self.canvas:
-                self.canvas.Clear()
-                self.matrix.SwapOnVSync(self.canvas)
-            
-            # Note: rgbmatrix doesn't have explicit cleanup
-            # The matrix will turn off when the process exits
-            
-        logger.info("HUB75 driver cleaned up")
+        """Clean up resources."""
+        # Nothing specific needed for RGB matrix cleanup
+        pass

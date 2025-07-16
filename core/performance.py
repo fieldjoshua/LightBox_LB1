@@ -78,8 +78,29 @@ class RollingAverage:
 class PerformanceMonitor:
     """System performance tracking with minimal overhead."""
     
-    def __init__(self, stats_interval: float = 10.0):
+    def __init__(self, stats_interval: int = 10):
+        """Initialize performance monitor.
+        
+        Args:
+            stats_interval: Interval for logging stats (seconds)
+        """
+        self.start_time = time.time()
+        self.frame_count = 0
+        self.frame_times = deque(maxlen=100)
+        self.render_times = deque(maxlen=100)
         self.stats_interval = stats_interval
+        self.last_stats_time = self.start_time
+        self.frame_start_time = 0
+        self.render_start_time = 0
+        self.avg_frame_time = 0
+        self.avg_render_time = 0
+        self.fps = 0.0  # Initialize fps attribute
+        
+        # CPU and memory monitoring
+        self.cpu_usage = 0.0
+        self.memory_usage = 0.0
+        self.last_cpu_check = self.start_time
+        
         self.metrics = {
             'fps': RollingAverage(30),
             'frame_time_ms': RollingAverage(30),
@@ -199,6 +220,34 @@ class PerformanceMonitor:
             'total_frames': self.metrics['total_frames'],
             'drop_rate': (self.metrics['dropped_frames'] / 
                          max(1, self.metrics['total_frames'])) * 100
+        }
+    
+    def get_fps(self) -> float:
+        """Get current FPS."""
+        return self.metrics['fps'].average
+    
+    def get_cpu_usage(self) -> float:
+        """Get current CPU usage percentage."""
+        return self.metrics['cpu_percent'].average
+    
+    def get_memory_usage(self) -> float:
+        """Get current memory usage in MB."""
+        return self.metrics['memory_mb'].average
+    
+    def get_metrics(self) -> dict:
+        """Get all performance metrics.
+        
+        Returns:
+            Dictionary of performance metrics
+        """
+        return {
+            "fps": self.get_fps(),
+            "frame_count": self.metrics['total_frames'],
+            "cpu_usage": self.get_cpu_usage(),
+            "memory_usage": self.get_memory_usage(),
+            "uptime": time.time() - self.start_time,
+            "render_time": self.metrics['frame_time_ms'].average / 1000.0,
+            "frame_time": self.metrics['frame_time_ms'].average / 1000.0
         }
     
     def log_stats(self):

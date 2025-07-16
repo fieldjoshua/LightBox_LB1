@@ -298,8 +298,8 @@ def download_file(filepath):
 def get_stats():
     """Get runtime statistics"""
     try:
-        if os.path.exists('/tmp/cosmic_stats.json'):
-            with open('/tmp/cosmic_stats.json', 'r') as f:
+        if os.path.exists('/tmp/lightbox_stats.json'):
+            with open('/tmp/lightbox_stats.json', 'r') as f:
                 stats = json.load(f)
             return jsonify(stats)
         return jsonify({'error': 'Stats not available'}), 404

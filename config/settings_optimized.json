@@ -1,0 +1,16 @@
+{
+  "platform": "raspberry_pi",
+  "matrix_type": "hub75",
+  "target_fps": 25,
+  "brightness": 0.7,
+  "hub75": {
+    "rows": 64,
+    "cols": 64,
+    "gpio_slowdown": 3,
+    "pwm_bits": 7,
+    "pwm_lsb_nanoseconds": 120,
+    "limit_refresh": 100,
+    "hardware_pwm": "off",
+    "disable_hardware_pulsing": true
+  }
+}

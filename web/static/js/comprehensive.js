@@ -1,603 +1,849 @@
 /**
- * LightBox Comprehensive Web Interface
- * Handles all configuration, optimization, and control features
+ * LightBox HUB75 Comprehensive Control
+ * Advanced JavaScript for comprehensive web control panel with WebSocket support
  */
 
-class LightBoxController {
-    constructor() {
-        this.ws = null;
-        this.isConnected = false;
-        this.currentConfig = {};
-        this.animations = [];
-        this.presets = [];
-        this.updateInterval = null;
-        this.programs = []; // Use 'programs' to be consistent with backend
+// Global state
+let socket;
+let config = {};
+let animations = [];
+let currentAnimation = "";
+let presets = {};
+let performanceData = {
+    fps: 0,
+    frameCount: 0,
+    refreshRate: 0,
+    cpuUsage: 0,
+    memory: 0,
+    uptime: 0
+};
+let hwPwmDetected = false;
+let cpuIsolationDetected = false;
+
+// Initialize on DOM content loaded
+document.addEventListener('DOMContentLoaded', () => {
+    initializeWebSocket();
+    fetchInitialData();
+    setupEventListeners();
+});
+
+// Initialize WebSocket connection for real-time updates
+function initializeWebSocket() {
+    try {
+        // Get the current host from the browser URL
+        const host = window.location.hostname;
+        const port = window.location.port;
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
         
-        this.init();
-    }
-
-    init() {
-        this.setupEventListeners();
-        this.setupTabs();
-        this.setupWebSocket();
-        this.loadInitialData();
-        this.startPerformanceUpdates();
-    }
-
-    setupEventListeners() {
-        // Basic controls
-        this.setupSlider('brightness', (value) => this.updateConfig('brightness', value / 100));
-        this.setupSlider('speed', (value) => this.updateConfig('speed', value / 100));
-        
-        // Hardware configuration sliders
-        this.setupSlider('target-fps', (value) => this.updateConfig('target_fps', parseInt(value)));
-        this.setupSlider('ws2811-gamma', (value) => this.updateConfig('ws2811.gamma', parseFloat(value)));
-        this.setupSlider('hue-shift', (value) => this.updateConfig('hue_shift', parseInt(value)));
-        this.setupSlider('saturation', (value) => this.updateConfig('saturation', value / 100));
-        this.setupSlider('contrast', (value) => this.updateConfig('contrast', value / 100));
-
-        // Selects
-        document.getElementById('animation').addEventListener('change', (e) => {
-            this.updateConfig('animation_program', e.target.value);
+        // Connect to Socket.IO endpoint
+        socket = io(`${wsProtocol}://${host}:${port}`, {
+            reconnection: true,
+            reconnectionAttempts: Infinity,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000
         });
 
-        document.getElementById('palette').addEventListener('change', (e) => {
-            this.updateConfig('color_palette', e.target.value);
+        // Socket event handlers
+        socket.on('connect', () => {
+            updateConnectionStatus(true);
+            console.log('WebSocket connected');
         });
 
-        // Program selection and switching
-        document.getElementById('program-select').addEventListener('change', () => {
-            this.loadProgramParameters();
+        socket.on('disconnect', () => {
+            updateConnectionStatus(false);
+            console.log('WebSocket disconnected');
         });
 
-        document.getElementById('switch-program').addEventListener('click', () => {
-            const programName = document.getElementById('program-select').value;
-            this.switchProgram(programName);
+        socket.on('connect_error', (error) => {
+            updateConnectionStatus(false);
+            console.error('WebSocket connection error:', error);
         });
 
-        // Hardware configuration inputs
-        this.setupConfigInput('buffer-pool-size', 'performance.buffer_pool_size', 'number');
-        this.setupConfigInput('cache-size', 'performance.cache_size', 'number');
-        this.setupConfigInput('stats-interval', 'performance.stats_interval', 'number');
-        
-        this.setupConfigInput('ws2811-pixels', 'ws2811.num_pixels', 'number');
-        this.setupConfigInput('ws2811-width', 'ws2811.width', 'number');
-        this.setupConfigInput('ws2811-height', 'ws2811.height', 'number');
-        this.setupConfigInput('ws2811-pin', 'ws2811.data_pin');
-        
-        this.setupConfigInput('hub75-rows', 'hub75.rows', 'number');
-        this.setupConfigInput('hub75-cols', 'hub75.cols', 'number');
-        this.setupConfigInput('hub75-chain', 'hub75.chain_length', 'number');
-        this.setupConfigInput('hub75-parallel', 'hub75.parallel', 'number');
-        this.setupConfigInput('hub75-pwm-bits', 'hub75.pwm_bits', 'number');
-        this.setupConfigInput('hub75-pwm-lsb', 'hub75.pwm_lsb_nanoseconds', 'number');
-        this.setupConfigInput('hub75-slowdown', 'hub75.gpio_slowdown', 'number');
-        this.setupConfigInput('hub75-scan-mode', 'hub75.scan_mode', 'number');
-
-        // Checkboxes
-        this.setupCheckbox('enable-caching', 'performance.enable_caching');
-        this.setupCheckbox('enable-profiling', 'performance.enable_profiling');
-        this.setupCheckbox('ws2811-serpentine', 'ws2811.serpentine');
-        this.setupCheckbox('hub75-hardware-pwm', 'hub75.hardware_pwm');
-        this.setupCheckbox('hub75-cpu-isolation', 'hub75.cpu_isolation');
-
-        // Action buttons
-        document.getElementById('reset-animation').addEventListener('click', () => this.resetAnimation());
-        document.getElementById('clear-cache').addEventListener('click', () => this.clearCache());
-        document.getElementById('save-preset').addEventListener('click', () => this.saveCurrentPreset());
-        document.getElementById('emergency-stop').addEventListener('click', () => this.emergencyStop());
-
-        // Preset management
-        document.getElementById('load-preset').addEventListener('click', () => this.loadSelectedPreset());
-        document.getElementById('save-new-preset').addEventListener('click', () => this.saveNewPreset());
-        document.getElementById('delete-preset').addEventListener('click', () => this.deleteSelectedPreset());
-    }
-
-    setupSlider(id, callback) {
-        const slider = document.getElementById(id);
-        const valueDisplay = document.getElementById(`${id}-value`);
-        
-        slider.addEventListener('input', (e) => {
-            const value = parseFloat(e.target.value);
-            let displayValue;
-            
-            switch(id) {
-                case 'brightness':
-                case 'saturation':
-                case 'contrast':
-                    displayValue = `${value}%`;
-                    break;
-                case 'speed':
-                    displayValue = `${(value / 100).toFixed(1)}x`;
-                    break;
-                case 'hue-shift':
-                    displayValue = `${value}°`;
-                    break;
-                case 'ws2811-gamma':
-                    displayValue = value.toFixed(1);
-                    break;
-                default:
-                    displayValue = value.toString();
-            }
-            
-            valueDisplay.textContent = displayValue;
-            callback(value);
+        // Listen for real-time updates
+        socket.on('performance_update', (data) => {
+            updatePerformanceMetrics(data);
         });
-    }
 
-    setupConfigInput(id, configPath, type = 'text') {
-        const input = document.getElementById(id);
-        input.addEventListener('change', (e) => {
-            let value = e.target.value;
-            if (type === 'number') {
-                value = parseFloat(value);
-            }
-            this.updateNestedConfig(configPath, value);
+        socket.on('status_update', (data) => {
+            updateStatusDisplay(data);
         });
-    }
 
-    setupCheckbox(id, configPath) {
-        const checkbox = document.getElementById(id);
-        checkbox.addEventListener('change', (e) => {
-            this.updateNestedConfig(configPath, e.target.checked);
+        socket.on('config_update', (data) => {
+            updateConfig(data);
         });
-    }
 
-    setupTabs() {
-        const tabs = document.querySelectorAll('.tab');
-        const tabContents = document.querySelectorAll('.tab-content');
-
-        tabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                // Remove active class from all tabs and contents
-                tabs.forEach(t => t.classList.remove('active'));
-                tabContents.forEach(tc => tc.classList.remove('active'));
-
-                // Add active class to clicked tab and corresponding content
-                tab.classList.add('active');
-                const tabId = tab.dataset.tab;
-                document.getElementById(`${tabId}-tab`).classList.add('active');
-            });
+        socket.on('hardware_status', (data) => {
+            updateHardwareStatus(data);
         });
-    }
 
-    setupWebSocket() {
-        try {
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/socket.io/`;
-            
-            this.ws = io();
-            
-            this.ws.on('connect', () => {
-                console.log('WebSocket connected');
-                this.updateConnectionStatus(true);
-            });
-
-            this.ws.on('disconnect', () => {
-                console.log('WebSocket disconnected');
-                this.updateConnectionStatus(false);
-            });
-
-            this.ws.on('batch_update', (data) => {
-                this.handleBatchUpdate(data);
-            });
-
-            this.ws.on('status_update', (data) => {
-                this.updatePerformanceMetrics(data);
-            });
-
-        } catch (error) {
-            console.warn('WebSocket not available, falling back to polling');
-            this.setupPolling();
-        }
-    }
-
-    updateConnectionStatus(connected) {
-        this.isConnected = connected;
-        const indicator = document.getElementById('status-indicator');
-        const text = document.getElementById('status-text');
-        
-        if (connected) {
-            indicator.style.background = 'var(--success)';
-            text.textContent = 'Connected';
-        } else {
-            indicator.style.background = 'var(--error)';
-            text.textContent = 'Disconnected';
-        }
-    }
-
-    async loadInitialData() {
-        try {
-            const statusResponse = await fetch('/api/status');
-            const status = await statusResponse.json();
-            this.programs = status.programs;
-            this.currentConfig = status.config;
-            this.populateProgramList();
-            this.updateUIFromConfig();
-            // Presets and other data can be loaded here as before
-        } catch (error) {
-            console.error('Error loading initial data:', error);
-        }
-    }
-
-    updateUIFromConfig() {
-        // Update basic controls
-        if (this.currentConfig.brightness !== undefined) {
-            const brightness = Math.round(this.currentConfig.brightness * 100);
-            document.getElementById('brightness').value = brightness;
-            document.getElementById('brightness-value').textContent = `${brightness}%`;
-        }
-
-        if (this.currentConfig.speed !== undefined) {
-            const speed = Math.round(this.currentConfig.speed * 100);
-            document.getElementById('speed').value = speed;
-            document.getElementById('speed-value').textContent = `${(speed / 100).toFixed(1)}x`;
-        }
-
-        if (this.currentConfig.animation_program) {
-            document.getElementById('animation').value = this.currentConfig.animation_program;
-        }
-
-        if (this.currentConfig.color_palette) {
-            document.getElementById('palette').value = this.currentConfig.color_palette;
-        }
-
-        // Update target FPS
-        if (this.currentConfig.target_fps !== undefined) {
-            document.getElementById('target-fps').value = this.currentConfig.target_fps;
-            document.getElementById('target-fps-value').textContent = this.currentConfig.target_fps.toString();
-        }
-    }
-
-    populateProgramList() {
-        const select = document.getElementById('program-select');
-        select.innerHTML = '';
-        this.programs.forEach(program => {
-            const option = document.createElement('option');
-            option.value = program;
-            option.textContent = program.charAt(0).toUpperCase() + program.slice(1);
-            select.appendChild(option);
-        });
-        // Set the current program as selected
-        if (this.currentConfig.current_program) {
-            select.value = this.currentConfig.current_program;
-        }
-        this.loadProgramParameters(); // Load params for the selected program
-    }
-
-    async loadProgramParameters() {
-        const programName = document.getElementById('program-select').value;
-        if (!programName) return;
-
-        try {
-            const response = await fetch(`/api/program-parameters/${programName}`);
-            const data = await response.json();
-            this.renderParameters(data.parameters);
-        } catch (error) {
-            console.error(`Error loading parameters for ${programName}:`, error);
-        }
-    }
-
-    renderParameters(parameters) {
-        const container = document.getElementById('program-parameters-container');
-        container.innerHTML = ''; // Clear existing controls
-        
-        for (const key in parameters) {
-            const param = parameters[key];
-            const controlGroup = document.createElement('div');
-            controlGroup.className = 'control-group';
-
-            const label = document.createElement('label');
-            label.setAttribute('for', key);
-            label.textContent = param.description || key;
-            
-            let input;
-            // Create sliders, inputs, etc. based on param.type
-            if (param.type === 'range') {
-                input = document.createElement('input');
-                input.type = 'range';
-                input.min = param.min || 0;
-                input.max = param.max || 100;
-                input.step = param.step || 1;
-                input.value = param.value || param.default;
-            } else { // Default to text input
-                input = document.createElement('input');
-                input.type = 'text';
-                input.value = param.value || param.default;
-            }
-            input.id = key;
-
-            controlGroup.appendChild(label);
-            controlGroup.appendChild(input);
-            container.appendChild(controlGroup);
-            
-            // Add event listener to update parameter on change
-            input.addEventListener('change', (e) => {
-                this.updateProgramParameter(programName, key, e.target.value);
-            });
-        }
-    }
-
-    updateSystemInfo(status) {
-        document.getElementById('platform').textContent = status.platform || '--';
-        document.getElementById('matrix-type').textContent = status.matrix_type || '--';
-        document.getElementById('resolution').textContent = 
-            status.resolution ? `${status.resolution.width}x${status.resolution.height}` : '--';
-    }
-
-    startPerformanceUpdates() {
-        this.updateInterval = setInterval(() => {
-            this.fetchPerformanceData();
-        }, 2000);
-    }
-
-    async fetchPerformanceData() {
-        try {
-            const response = await fetch('/api/performance');
-            const data = await response.json();
-            this.updatePerformanceMetrics(data);
-        } catch (error) {
-            console.error('Error fetching performance data:', error);
-        }
-    }
-
-    updatePerformanceMetrics(data) {
-        // Update FPS
-        if (data.fps) {
-            document.getElementById('fps').textContent = data.fps.current?.toFixed(1) || '--';
-            this.updatePerformanceBar('fps-bar', data.fps.current, 60);
-        }
-
-        // Update CPU
-        if (data.cpu_percent) {
-            document.getElementById('cpu').textContent = `${data.cpu_percent.current?.toFixed(1) || '--'}%`;
-            this.updatePerformanceBar('cpu-bar', data.cpu_percent.current, 100);
-        }
-
-        // Update Memory
-        if (data.memory_mb) {
-            document.getElementById('memory').textContent = `${data.memory_mb.current?.toFixed(0) || '--'} MB`;
-            this.updatePerformanceBar('memory-bar', data.memory_mb.current, 512);
-        }
-
-        // Update Frame Time
-        if (data.frame_time_ms) {
-            document.getElementById('frame-time').textContent = `${data.frame_time_ms.current?.toFixed(1) || '--'} ms`;
-        }
-
-        // Update dropped frames
-        if (data.dropped_frames_percent) {
-            const dropped = data.dropped_frames_percent.current || 0;
-            document.getElementById('dropped').textContent = `${dropped.toFixed(1)}%`;
-        }
-
-        // Update cache hit rate
-        if (data.cache_hit_rate) {
-            const hitRate = data.cache_hit_rate.current || 0;
-            document.getElementById('cache-hit').textContent = `${hitRate.toFixed(1)}%`;
-        }
-    }
-
-    updatePerformanceBar(barId, value, max) {
-        const bar = document.getElementById(barId);
-        if (!bar || value === undefined) return;
-
-        const percentage = Math.min((value / max) * 100, 100);
-        bar.style.width = `${percentage}%`;
-
-        // Color coding
-        if (percentage < 50) {
-            bar.style.background = 'var(--success)';
-        } else if (percentage < 80) {
-            bar.style.background = 'var(--warning)';
-        } else {
-            bar.style.background = 'var(--error)';
-        }
-    }
-
-    async updateConfig(key, value) {
-        try {
-            const response = await fetch('/api/config', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ [key]: value }),
-            });
-
-            if (response.ok) {
-                this.currentConfig[key] = value;
-            } else {
-                console.error('Failed to update config:', await response.text());
-            }
-        } catch (error) {
-            console.error('Error updating config:', error);
-        }
-    }
-
-    updateNestedConfig(path, value) {
-        const keys = path.split('.');
-        const data = {};
-        let current = data;
-
-        for (let i = 0; i < keys.length - 1; i++) {
-            current[keys[i]] = {};
-            current = current[keys[i]];
-        }
-        current[keys[keys.length - 1]] = value;
-
-        this.updateConfig(keys[0], keys.length === 1 ? value : data[keys[0]]);
-    }
-
-    async updateAnimationParam(param, value) {
-        try {
-            const response = await fetch('/api/animation/param', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ param, value }),
-            });
-
-            if (!response.ok) {
-                console.error('Failed to update animation param:', await response.text());
-            }
-        } catch (error) {
-            console.error('Error updating animation param:', error);
-        }
-    }
-
-    async resetAnimation() {
-        try {
-            const response = await fetch('/api/animation/reset', { method: 'POST' });
-            if (response.ok) {
-                console.log('Animation reset successfully');
-            }
-        } catch (error) {
-            console.error('Error resetting animation:', error);
-        }
-    }
-
-    async clearCache() {
-        try {
-            const response = await fetch('/api/cache/clear', { method: 'POST' });
-            if (response.ok) {
-                console.log('Cache cleared successfully');
-            }
-        } catch (error) {
-            console.error('Error clearing cache:', error);
-        }
-    }
-
-    async saveCurrentPreset() {
-        const name = prompt('Enter preset name:');
-        if (name) {
-            try {
-                const response = await fetch(`/api/preset/${name}`, { method: 'POST' });
-                if (response.ok) {
-                    console.log('Preset saved successfully');
-                    await this.loadInitialData(); // Refresh preset list
-                }
-            } catch (error) {
-                console.error('Error saving preset:', error);
-            }
-        }
-    }
-
-    async saveNewPreset() {
-        const name = document.getElementById('preset-name').value.trim();
-        if (!name) {
-            alert('Please enter a preset name');
-            return;
-        }
-
-        try {
-            const response = await fetch(`/api/preset/${name}`, { method: 'POST' });
-            if (response.ok) {
-                console.log('Preset saved successfully');
-                document.getElementById('preset-name').value = '';
-                await this.loadInitialData(); // Refresh preset list
-            }
-        } catch (error) {
-            console.error('Error saving preset:', error);
-        }
-    }
-
-    async loadSelectedPreset() {
-        const presetName = document.getElementById('preset-list').value;
-        if (!presetName) {
-            alert('Please select a preset to load');
-            return;
-        }
-
-        try {
-            const response = await fetch(`/api/preset/${presetName}`, { method: 'GET' });
-            if (response.ok) {
-                console.log('Preset loaded successfully');
-                await this.loadInitialData(); // Refresh UI
-            }
-        } catch (error) {
-            console.error('Error loading preset:', error);
-        }
-    }
-
-    async deleteSelectedPreset() {
-        const presetName = document.getElementById('preset-list').value;
-        if (!presetName) {
-            alert('Please select a preset to delete');
-            return;
-        }
-
-        if (confirm(`Are you sure you want to delete preset "${presetName}"?`)) {
-            try {
-                const response = await fetch(`/api/preset/${presetName}`, { method: 'DELETE' });
-                if (response.ok) {
-                    console.log('Preset deleted successfully');
-                    await this.loadInitialData(); // Refresh preset list
-                }
-            } catch (error) {
-                console.error('Error deleting preset:', error);
-            }
-        }
-    }
-
-    async emergencyStop() {
-        if (confirm('Emergency stop will immediately halt all animations. Continue?')) {
-            try {
-                const response = await fetch('/api/emergency-stop', { method: 'POST' });
-                if (response.ok) {
-                    console.log('Emergency stop activated');
-                }
-            } catch (error) {
-                console.error('Error during emergency stop:', error);
-            }
-        }
-    }
-
-    async switchProgram(programName) {
-        try {
-            await fetch('/api/program', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ program: programName })
-            });
-        } catch (error) {
-            console.error('Error switching program:', error);
-        }
-    }
-
-    handleBatchUpdate(data) {
-        data.updates.forEach(([event, updateData]) => {
-            switch (event) {
-                case 'config_update':
-                    Object.assign(this.currentConfig, updateData);
-                    this.updateUIFromConfig();
-                    break;
-                case 'performance_update':
-                    this.updatePerformanceMetrics(updateData);
-                    break;
-                default:
-                    console.log('Unknown update event:', event);
+        // Handle batch updates
+        socket.on('batch_update', (data) => {
+            for (const update of data.updates) {
+                const [event, payload] = update;
+                handleBatchUpdate(event, payload);
             }
         });
-    }
-
-    setupPolling() {
-        // Fallback polling if WebSocket is not available
-        setInterval(() => {
-            this.fetchPerformanceData();
-        }, 5000);
+    } catch (error) {
+        console.error('Failed to initialize WebSocket:', error);
+        updateConnectionStatus(false);
     }
 }
 
-// Initialize the controller
-document.addEventListener('DOMContentLoaded', () => {
-    new LightBoxController();
-});
-
-// Handle page unload
-window.addEventListener('beforeunload', () => {
-    if (window.lightboxController && window.lightboxController.updateInterval) {
-        clearInterval(window.lightboxController.updateInterval);
+// Handle batched updates from server
+function handleBatchUpdate(event, payload) {
+    switch (event) {
+        case 'performance_update':
+            updatePerformanceMetrics(payload);
+            break;
+        case 'status_update':
+            updateStatusDisplay(payload);
+            break;
+        case 'config_update':
+            updateConfig(payload);
+            break;
+        case 'hardware_status':
+            updateHardwareStatus(payload);
+            break;
+        default:
+            console.log(`Unhandled event type: ${event}`);
     }
-});
+}
+
+// Fetch initial data from server
+async function fetchInitialData() {
+    try {
+        // Fetch configuration
+        const configResponse = await fetch('/api/hardware/config');
+        if (configResponse.ok) {
+            config = await configResponse.json();
+            updateUIFromConfig(config);
+        }
+
+        // Fetch animations list
+        const animationsResponse = await fetch('/api/animations');
+        if (animationsResponse.ok) {
+            const animData = await animationsResponse.json();
+            animations = animData.animations || [];
+            populateAnimationSelector(animations);
+        }
+
+        // Fetch palettes
+        const palettesResponse = await fetch('/api/palettes');
+        if (palettesResponse.ok) {
+            const paletteData = await palettesResponse.json();
+            populatePaletteSelector(paletteData.palettes);
+        }
+
+        // Fetch presets
+        const presetsResponse = await fetch('/api/presets');
+        if (presetsResponse.ok) {
+            presets = await presetsResponse.json();
+            populatePresetsList(presets);
+        }
+
+        // Fetch system info
+        const systemResponse = await fetch('/api/system/info');
+        if (systemResponse.ok) {
+            const systemInfo = await systemResponse.json();
+            updateSystemInfo(systemInfo);
+        }
+    } catch (error) {
+        console.error('Failed to fetch initial data:', error);
+    }
+}
+
+// Update UI with config values
+function updateUIFromConfig(config) {
+    // Display configuration
+    if (config.hub75) {
+        document.getElementById('matrix-rows').value = config.hub75.rows || 64;
+        document.getElementById('matrix-cols').value = config.hub75.cols || 64;
+        document.getElementById('chain-length').value = config.hub75.chain_length || 1;
+        document.getElementById('parallel').value = config.hub75.parallel || 1;
+        
+        // Select the hardware mapping
+        const mappingSelect = document.getElementById('hardware-mapping');
+        if (mappingSelect) {
+            mappingSelect.value = config.hub75.hardware_mapping || 'adafruit-hat';
+        }
+        
+        // Panel configuration
+        document.getElementById('scan-mode').value = config.hub75.scan_mode || 0;
+        document.getElementById('row-address-type').value = config.hub75.row_address_type || 0;
+        document.getElementById('multiplexing').value = config.hub75.multiplexing || 0;
+        
+        // PWM configuration
+        const pwmBits = document.getElementById('pwm-bits');
+        if (pwmBits) {
+            pwmBits.value = config.hub75.pwm_bits || 11;
+            document.getElementById('pwm-bits-value').textContent = pwmBits.value;
+        }
+        
+        const pwmLsb = document.getElementById('pwm-lsb-ns');
+        if (pwmLsb) {
+            pwmLsb.value = config.hub75.pwm_lsb_nanoseconds || 130;
+            document.getElementById('pwm-lsb-ns-value').textContent = pwmLsb.value;
+        }
+        
+        const pwmDither = document.getElementById('pwm-dither-bits');
+        if (pwmDither) {
+            pwmDither.value = config.hub75.pwm_dither_bits || 0;
+            document.getElementById('pwm-dither-bits-value').textContent = pwmDither.value;
+        }
+        
+        // Hardware PWM
+        document.getElementById('hardware-pwm').value = config.hub75.hardware_pwm || 'auto';
+        document.getElementById('hardware-pwm-mod').checked = 
+            config.hardware && config.hardware.hardware_pwm_mod;
+            
+        // Performance settings
+        const gpioSlowdown = document.getElementById('gpio-slowdown');
+        if (gpioSlowdown) {
+            gpioSlowdown.value = config.hub75.gpio_slowdown || 4;
+            document.getElementById('gpio-slowdown-value').textContent = gpioSlowdown.value;
+        }
+        
+        const limitRefresh = document.getElementById('limit-refresh');
+        if (limitRefresh) {
+            limitRefresh.value = config.hub75.limit_refresh || 120;
+            document.getElementById('limit-refresh-value').textContent = 
+                limitRefresh.value > 0 ? `${limitRefresh.value} Hz` : 'Unlimited';
+        }
+    }
+    
+    // Target FPS
+    const targetFps = document.getElementById('target-fps');
+    if (targetFps) {
+        targetFps.value = config.target_fps || 30;
+        document.getElementById('target-fps-value').textContent = targetFps.value;
+    }
+    
+    // Performance settings
+    if (config.performance) {
+        document.getElementById('cpu-isolation').checked = 
+            config.performance.cpu_isolation !== undefined ? config.performance.cpu_isolation : true;
+        document.getElementById('double-buffering').checked = 
+            config.performance.use_double_buffering !== undefined ? config.performance.use_double_buffering : true;
+        document.getElementById('show-refresh-rate').checked = 
+            config.hub75 && config.hub75.show_refresh_rate;
+        document.getElementById('fixed-frame-time').checked = 
+            config.performance.fixed_frame_time !== undefined ? config.performance.fixed_frame_time : true;
+    }
+    
+    // System settings
+    if (config.system) {
+        document.getElementById('log-level').value = config.system.log_level || 'INFO';
+        document.getElementById('auto-save-presets').checked = 
+            config.system.auto_save_presets !== undefined ? config.system.auto_save_presets : true;
+        document.getElementById('headless-mode').checked = 
+            config.system.headless_mode !== undefined ? config.system.headless_mode : true;
+        document.getElementById('os-optimization').checked = 
+            config.system.os_optimization !== undefined ? config.system.os_optimization : true;
+    }
+    
+    // Hardware components
+    if (config.hardware) {
+        document.getElementById('buttons-enabled').checked = 
+            config.hardware.buttons_enabled !== undefined ? config.hardware.buttons_enabled : true;
+        document.getElementById('oled-enabled').checked = 
+            config.hardware.oled_enabled !== undefined ? config.hardware.oled_enabled : true;
+    }
+    
+    // Animation controls
+    document.getElementById('brightness').value = config.brightness || 0.8;
+    document.getElementById('brightness-value').textContent = `${Math.round((config.brightness || 0.8) * 100)}%`;
+    
+    document.getElementById('speed').value = config.animations ? (config.animations.speed || 1.0) : 1.0;
+    document.getElementById('speed-value').textContent = `${document.getElementById('speed').value}x`;
+    
+    document.getElementById('intensity').value = config.animations ? (config.animations.intensity || 1.0) : 1.0;
+    document.getElementById('intensity-value').textContent = `${document.getElementById('intensity').value}x`;
+    
+    document.getElementById('scale').value = config.animations ? (config.animations.scale || 1.0) : 1.0;
+    document.getElementById('scale-value').textContent = `${document.getElementById('scale').value}x`;
+}
+
+// Populate animation selector
+function populateAnimationSelector(animations) {
+    const select = document.getElementById('animation-select');
+    if (!select) return;
+    
+    select.innerHTML = '';
+    
+    animations.forEach(anim => {
+        const option = document.createElement('option');
+        option.value = anim.name || anim;
+        option.textContent = formatAnimationName(anim.name || anim);
+        select.appendChild(option);
+        
+        // Set as selected if it's the current animation
+        if (anim.name === currentAnimation || anim === currentAnimation) {
+            option.selected = true;
+        }
+    });
+    
+    // Load animation parameters for the current selection
+    loadAnimationParameters(select.value);
+}
+
+// Format animation name for display (convert snake_case or camelCase to Title Case)
+function formatAnimationName(name) {
+    return name
+        .replace(/([a-z])([A-Z])/g, '$1 $2') // Convert camelCase to spaces
+        .replace(/_/g, ' ')                   // Convert snake_case to spaces
+        .replace(/^\w/, c => c.toUpperCase()) // Capitalize first letter
+        .replace(/\b\w/g, l => l.toUpperCase()); // Capitalize each word
+}
+
+// Populate palette selector
+function populatePaletteSelector(palettes) {
+    const select = document.getElementById('palette');
+    if (!select) return;
+    
+    select.innerHTML = '';
+    
+    palettes.forEach(palette => {
+        const option = document.createElement('option');
+        option.value = palette.name || palette;
+        option.textContent = formatAnimationName(palette.name || palette);
+        select.appendChild(option);
+        
+        // Set as selected if it's the current palette
+        if (config.palettes && palette === config.palettes.current) {
+            option.selected = true;
+            updatePalettePreview(palette);
+        }
+    });
+}
+
+// Update palette preview
+function updatePalettePreview(paletteName) {
+    const preview = document.getElementById('palette-preview');
+    if (!preview || !config.palettes || !config.palettes[paletteName]) return;
+    
+    const colors = config.palettes[paletteName];
+    if (!Array.isArray(colors)) return;
+    
+    // Create a gradient CSS string
+    const stops = colors.map((color, index) => {
+        const percent = (index / (colors.length - 1)) * 100;
+        const [r, g, b] = color;
+        return `rgb(${r}, ${g}, ${b}) ${percent}%`;
+    }).join(', ');
+    
+    preview.style.background = `linear-gradient(90deg, ${stops})`;
+}
+
+// Populate presets list
+function populatePresetsList(presets) {
+    const list = document.getElementById('presets-list');
+    if (!list) return;
+    
+    list.innerHTML = '';
+    
+    Object.entries(presets).forEach(([name, preset]) => {
+        const presetDiv = document.createElement('div');
+        presetDiv.className = 'control-group';
+        
+        const presetName = document.createElement('div');
+        presetName.textContent = name;
+        presetName.style.marginBottom = '8px';
+        
+        const buttonsDiv = document.createElement('div');
+        buttonsDiv.style.display = 'flex';
+        buttonsDiv.style.gap = '8px';
+        
+        const loadButton = document.createElement('button');
+        loadButton.textContent = 'Load';
+        loadButton.onclick = () => loadPreset(name);
+        
+        const deleteButton = document.createElement('button');
+        deleteButton.textContent = 'Delete';
+        deleteButton.className = 'danger';
+        deleteButton.onclick = () => deletePreset(name);
+        
+        buttonsDiv.appendChild(loadButton);
+        buttonsDiv.appendChild(deleteButton);
+        
+        presetDiv.appendChild(presetName);
+        presetDiv.appendChild(buttonsDiv);
+        
+        list.appendChild(presetDiv);
+    });
+}
+
+// Load animation parameters
+function loadAnimationParameters(animationName) {
+    fetch(`/api/animation/${animationName}/params`)
+        .then(response => response.json())
+        .then(params => {
+            const container = document.getElementById('animation-params');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            if (!params || Object.keys(params).length === 0) {
+                container.innerHTML = '<p>No adjustable parameters for this animation.</p>';
+                return;
+            }
+            
+            Object.entries(params).forEach(([param, value]) => {
+                const paramType = typeof value;
+                const group = document.createElement('div');
+                group.className = 'control-group';
+                
+                const label = document.createElement('label');
+                label.textContent = formatAnimationName(param);
+                group.appendChild(label);
+                
+                if (paramType === 'number') {
+                    const row = document.createElement('div');
+                    row.className = 'control-row';
+                    
+                    const input = document.createElement('input');
+                    input.type = 'range';
+                    input.id = `param-${param}`;
+                    input.min = value / 10;
+                    input.max = value * 10;
+                    input.step = value / 20;
+                    input.value = value;
+                    
+                    const valueDisplay = document.createElement('span');
+                    valueDisplay.id = `param-${param}-value`;
+                    valueDisplay.textContent = value;
+                    
+                    input.oninput = () => {
+                        valueDisplay.textContent = input.value;
+                        updateAnimationParameter(animationName, param, parseFloat(input.value));
+                    };
+                    
+                    row.appendChild(input);
+                    row.appendChild(valueDisplay);
+                    group.appendChild(row);
+                } else if (paramType === 'boolean') {
+                    const checkboxGroup = document.createElement('div');
+                    checkboxGroup.className = 'checkbox-group';
+                    
+                    const input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.id = `param-${param}`;
+                    input.checked = value;
+                    
+                    input.onchange = () => {
+                        updateAnimationParameter(animationName, param, input.checked);
+                    };
+                    
+                    checkboxGroup.appendChild(input);
+                    
+                    const checkboxLabel = document.createElement('label');
+                    checkboxLabel.textContent = formatAnimationName(param);
+                    checkboxLabel.setAttribute('for', `param-${param}`);
+                    checkboxGroup.appendChild(checkboxLabel);
+                    
+                    group.appendChild(checkboxGroup);
+                } else if (Array.isArray(value)) {
+                    const select = document.createElement('select');
+                    select.id = `param-${param}`;
+                    
+                    value.forEach(option => {
+                        const opt = document.createElement('option');
+                        opt.value = option;
+                        opt.textContent = option;
+                        select.appendChild(opt);
+                    });
+                    
+                    select.onchange = () => {
+                        updateAnimationParameter(animationName, param, select.value);
+                    };
+                    
+                    group.appendChild(select);
+                }
+                
+                container.appendChild(group);
+            });
+        })
+        .catch(error => {
+            console.error('Failed to load animation parameters:', error);
+        });
+}
+
+// Update animation parameter
+function updateAnimationParameter(animation, param, value) {
+    fetch('/api/animation/param', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            animation,
+            param,
+            value
+        })
+    })
+    .catch(error => {
+        console.error('Failed to update animation parameter:', error);
+    });
+}
+
+// Update connection status display
+function updateConnectionStatus(connected) {
+    const statusSpan = document.getElementById('connection-status');
+    if (!statusSpan) return;
+    
+    if (connected) {
+        statusSpan.textContent = 'Connected';
+        statusSpan.className = 'status-good';
+    } else {
+        statusSpan.textContent = 'Disconnected';
+        statusSpan.className = 'status-error';
+    }
+}
+
+// Update performance metrics display
+function updatePerformanceMetrics(data) {
+    performanceData = { ...performanceData, ...data };
+    
+    // Update FPS and refresh rate
+    document.getElementById('metric-fps').textContent = data.fps.toFixed(1);
+    document.getElementById('fps').textContent = data.fps.toFixed(1);
+    document.getElementById('metric-refresh-rate').textContent = `${data.refresh_rate.toFixed(1)} Hz`;
+    document.getElementById('refresh-rate').textContent = data.refresh_rate.toFixed(1);
+    
+    // Update other metrics
+    document.getElementById('metric-frame-count').textContent = data.frame_count;
+    document.getElementById('metric-cpu').textContent = `${data.cpu_usage.toFixed(1)}%`;
+    document.getElementById('metric-memory').textContent = `${(data.memory_usage / 1024 / 1024).toFixed(1)} MB`;
+    
+    // Format uptime as HH:MM:SS
+    const hours = Math.floor(data.uptime / 3600);
+    const minutes = Math.floor((data.uptime % 3600) / 60);
+    const seconds = Math.floor(data.uptime % 60);
+    const formattedUptime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    document.getElementById('metric-uptime').textContent = formattedUptime;
+}
+
+// Update status display with animation and config info
+function updateStatusDisplay(data) {
+    if (data.current_animation) {
+        currentAnimation = data.current_animation;
+        
+        // Update animation selector
+        const animationSelect = document.getElementById('animation-select');
+        if (animationSelect) {
+            for (let i = 0; i < animationSelect.options.length; i++) {
+                if (animationSelect.options[i].value === currentAnimation) {
+                    animationSelect.selectedIndex = i;
+                    break;
+                }
+            }
+        }
+    }
+    
+    // Update brightness and speed
+    if (data.brightness !== undefined) {
+        const brightnessSlider = document.getElementById('brightness');
+        if (brightnessSlider) {
+            brightnessSlider.value = data.brightness;
+            document.getElementById('brightness-value').textContent = `${Math.round(data.brightness * 100)}%`;
+        }
+    }
+    
+    if (data.speed !== undefined) {
+        const speedSlider = document.getElementById('speed');
+        if (speedSlider) {
+            speedSlider.value = data.speed;
+            document.getElementById('speed-value').textContent = `${data.speed}x`;
+        }
+    }
+    
+    // Update palette
+    if (data.palette) {
+        const paletteSelect = document.getElementById('palette');
+        if (paletteSelect) {
+            for (let i = 0; i < paletteSelect.options.length; i++) {
+                if (paletteSelect.options[i].value === data.palette) {
+                    paletteSelect.selectedIndex = i;
+                    updatePalettePreview(data.palette);
+                    break;
+                }
+            }
+        }
+    }
+}
+
+// Update hardware status indicators
+function updateHardwareStatus(data) {
+    if (data.hardware_pwm !== undefined) {
+        hwPwmDetected = data.hardware_pwm;
+        const hwPwmStatus = document.getElementById('hardware-pwm-status-value');
+        if (hwPwmStatus) {
+            hwPwmStatus.textContent = hwPwmDetected ? 'Detected' : 'Not Detected';
+            hwPwmStatus.className = hwPwmDetected ? 'status-good' : 'status-warning';
+        }
+    }
+    
+    if (data.cpu_isolation !== undefined) {
+        cpuIsolationDetected = data.cpu_isolation;
+        const cpuIsolationStatus = document.getElementById('cpu-isolation-status-value');
+        if (cpuIsolationStatus) {
+            cpuIsolationStatus.textContent = cpuIsolationDetected ? 'Enabled' : 'Not Detected';
+            cpuIsolationStatus.className = cpuIsolationDetected ? 'status-good' : 'status-warning';
+        }
+    }
+    
+    // Update system info
+    if (data.system) {
+        updateSystemInfo(data.system);
+    }
+}
+
+// Update system information display
+function updateSystemInfo(info) {
+    if (info.pi_model) {
+        document.getElementById('pi-model').textContent = info.pi_model;
+    }
+    
+    if (info.software_version) {
+        document.getElementById('software-version').textContent = info.software_version;
+    }
+    
+    if (info.driver_version) {
+        document.getElementById('driver-version').textContent = info.driver_version;
+    }
+    
+    if (info.network_status) {
+        document.getElementById('network-status').textContent = info.network_status;
+    }
+}
+
+// Update config object with new values
+function updateConfig(data) {
+    config = { ...config, ...data };
+    updateUIFromConfig(config);
+}
+
+// Load a preset
+function loadPreset(name) {
+    fetch(`/api/preset/${name}`, {
+        method: 'GET'
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log(`Loaded preset: ${name}`);
+    })
+    .catch(error => {
+        console.error(`Failed to load preset ${name}:`, error);
+    });
+}
+
+// Delete a preset
+function deletePreset(name) {
+    if (!confirm(`Are you sure you want to delete preset "${name}"?`)) {
+        return;
+    }
+    
+    fetch(`/api/preset/${name}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log(`Deleted preset: ${name}`);
+        fetchInitialData(); // Refresh preset list
+    })
+    .catch(error => {
+        console.error(`Failed to delete preset ${name}:`, error);
+    });
+}
+
+// Save current config as a preset
+function savePreset(name) {
+    fetch('/api/preset', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            name,
+            config: {
+                animation_program: currentAnimation,
+                brightness: parseFloat(document.getElementById('brightness').value),
+                speed: parseFloat(document.getElementById('speed').value),
+                intensity: parseFloat(document.getElementById('intensity').value),
+                scale: parseFloat(document.getElementById('scale').value),
+                palette: document.getElementById('palette').value
+            }
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log(`Saved preset: ${name}`);
+        fetchInitialData(); // Refresh preset list
+    })
+    .catch(error => {
+        console.error(`Failed to save preset ${name}:`, error);
+    });
+}
+
+// Set up event listeners
+function setupEventListeners() {
+    // Animation controls
+    document.getElementById('btn-apply-animation').addEventListener('click', () => {
+        const animation = document.getElementById('animation-select').value;
+        fetch('/api/animation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ animation })
+        })
+        .then(() => {
+            currentAnimation = animation;
+            loadAnimationParameters(animation);
+        })
+        .catch(error => {
+            console.error('Failed to set animation:', error);
+        });
+    });
+    
+    document.getElementById('btn-reset-animation').addEventListener('click', () => {
+        fetch('/api/animation/reset', {
+            method: 'POST'
+        })
+        .then(() => {
+            loadAnimationParameters(currentAnimation);
+        })
+        .catch(error => {
+            console.error('Failed to reset animation:', error);
+        });
+    });
+    
+    // Brightness control
+    document.getElementById('brightness').addEventListener('change', () => {
+        const brightness = parseFloat(document.getElementById('brightness').value);
+        fetch('/api/brightness', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ brightness })
+        })
+        .catch(error => {
+            console.error('Failed to set brightness:', error);
+        });
+    });
+    
+    // Speed control
+    document.getElementById('speed').addEventListener('change', () => {
+        const speed = parseFloat(document.getElementById('speed').value);
+        fetch('/api/speed', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ speed })
+        })
+        .catch(error => {
+            console.error('Failed to set speed:', error);
+        });
+    });
+    
+    // Palette selector
+    document.getElementById('palette').addEventListener('change', () => {
+        const palette = document.getElementById('palette').value;
+        fetch('/api/palette', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ palette })
+        })
+        .then(() => {
+            updatePalettePreview(palette);
+        })
+        .catch(error => {
+            console.error('Failed to set palette:', error);
+        });
+    });
+    
+    // Save preset
+    document.getElementById('btn-save-preset').addEventListener('click', () => {
+        const name = prompt('Enter preset name:');
+        if (name) {
+            savePreset(name);
+        }
+    });
+    
+    // Create preset
+    const createPresetBtn = document.getElementById('btn-create-preset');
+    if (createPresetBtn) {
+        createPresetBtn.addEventListener('click', () => {
+            const name = document.getElementById('new-preset-name').value;
+            if (name) {
+                savePreset(name);
+                document.getElementById('new-preset-name').value = '';
+            } else {
+                alert('Please enter a preset name');
+            }
+        });
+    }
+    
+    // System actions
+    document.getElementById('btn-clear-cache').addEventListener('click', () => {
+        fetch('/api/cache/clear', {
+            method: 'POST'
+        })
+        .then(() => {
+            alert('Cache cleared successfully');
+        })
+        .catch(error => {
+            console.error('Failed to clear cache:', error);
+        });
+    });
+    
+    document.getElementById('btn-optimize').addEventListener('click', () => {
+        fetch('/api/system/optimize', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(`System optimized: ${data.message}`);
+        })
+        .catch(error => {
+            console.error('Failed to optimize system:', error);
+        });
+    });
+    
+    document.getElementById('btn-emergency-stop').addEventListener('click', () => {
+        if (confirm('Are you sure you want to perform an emergency stop?')) {
+            fetch('/api/emergency-stop', {
+                method: 'POST'
+            })
+            .catch(error => {
+                console.error('Failed to perform emergency stop:', error);
+            });
+        }
+    });
+    
+    // Restart system
+    const restartBtn = document.getElementById('btn-restart');
+    if (restartBtn) {
+        restartBtn.addEventListener('click', () => {
+            if (confirm('Are you sure you want to restart the system?')) {
+                fetch('/api/system/restart', {
+                    method: 'POST'
+                })
+                .catch(error => {
+                    console.error('Failed to restart system:', error);
+                });
+            }
+        });
+    }
+    
+    // Animation select change
+    const animationSelect = document.getElementById('animation-select');
+    if (animationSelect) {
+        animationSelect.addEventListener('change', () => {
+            loadAnimationParameters(animationSelect.value);
+        });
+    }
+}

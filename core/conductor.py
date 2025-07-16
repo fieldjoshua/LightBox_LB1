@@ -11,7 +11,7 @@ import os
 import importlib.util
 import logging
 from pathlib import Path
-from typing import Dict, Optional, Any, Callable
+from typing import Dict, Optional, Any, Callable, Union
 
 from .config import ConfigManager
 from .performance import PerformanceMonitor, FrameRateLimiter, FrameBufferPool
@@ -48,9 +48,13 @@ class AnimationProgram:
 class Conductor:
     """Unified animation controller with performance optimizations."""
     
-    def __init__(self, config_path: str = "settings.json"):
+    def __init__(self, config_path_or_manager: Union[str, ConfigManager] = "config/settings.json"):
         # Core components
-        self.config = ConfigManager(config_path)
+        if isinstance(config_path_or_manager, ConfigManager):
+            self.config = config_path_or_manager
+        else:
+            self.config = ConfigManager(config_path_or_manager)
+            
         self.performance = PerformanceMonitor(
             stats_interval=self.config.get("performance.stats_interval", 10)
         )
@@ -109,7 +113,7 @@ class Conductor:
             self._load_animations()
             
             # Set initial animation
-            default_animation = self.config.get("animation_program", "cosmic")
+            default_animation = self.config.get("animation_program", "aurora_hub75")
             self.set_animation(default_animation)
             
             logger.info("Conductor initialization complete")
@@ -121,28 +125,6 @@ class Conductor:
     
     def _load_animations(self):
         """Load all available animation programs."""
-        # Built-in cosmic animation
-        try:
-            # Try absolute import first
-            from animations.cosmic import animate as cosmic_animate
-            self.animations["cosmic"] = AnimationProgram("cosmic", cosmic_animate)
-        except ImportError:
-            try:
-                # Try relative import
-                from ..animations.cosmic import animate as cosmic_animate
-                self.animations["cosmic"] = AnimationProgram("cosmic", cosmic_animate)
-            except ImportError:
-                # Load from file as fallback
-                cosmic_path = Path(__file__).parent.parent / "animations" / "cosmic.py"
-                if cosmic_path.exists():
-                    spec = importlib.util.spec_from_file_location("cosmic", cosmic_path)
-                    module = importlib.util.module_from_spec(spec)
-                    spec.loader.exec_module(module)
-                    if hasattr(module, 'animate'):
-                        self.animations["cosmic"] = AnimationProgram("cosmic", module.animate)
-                else:
-                    logger.warning("Could not load built-in cosmic animation")
-        
         # Load animations from scripts directory
         scripts_dirs = [
             Path("scripts"),
@@ -259,32 +241,22 @@ class Conductor:
         logger.info("Animation resumed")
     
     def stop(self):
-        """Stop the conductor."""
+        """Stop the conductor and clean up resources."""
+        if not self.running:
+            return
+            
         logger.info("Stopping conductor...")
         self.running = False
-        
-        # Stop web server if running
-        if self.web_server:
-            try:
-                # Flask apps don't have a stop method, but we can log it
-                logger.info("Web server shutdown requested")
-            except Exception as e:
-                logger.warning(f"Error stopping web server: {e}")
-        
-        # Clean up hardware
-        if self.hardware:
-            self.hardware.cleanup()
         
         # Clean up matrix
         if self.matrix:
             self.matrix.cleanup()
         
-        # Save configuration
-        self.config.cleanup()
-        
-        # Log final stats
-        self.performance.log_stats()
-        self.performance.cleanup()
+        # Clean up web server
+        if self.web_server:
+            logger.info("Web server shutdown requested")
+            
+        # Don't call cleanup on config manager as it doesn't have this method
         
         logger.info("Conductor stopped")
     
@@ -292,7 +264,7 @@ class Conductor:
         """Handle shutdown signals."""
         logger.info(f"Received signal {signum}")
         self.stop()
-        sys.exit(0)
+        # Don't call sys.exit() here - let the main loop handle shutdown
     
     def set_brightness(self, brightness: float):
         """Set matrix brightness."""

@@ -8,6 +8,7 @@ Defines the interface that both WS2811 and HUB75 drivers must implement.
 from abc import ABC, abstractmethod
 from typing import Tuple, List, Union
 import logging
+import platform
 
 logger = logging.getLogger(__name__)
 
@@ -204,10 +205,20 @@ def create_matrix_driver(config) -> MatrixDriver:
         hardware_available = True
     except ImportError:
         hardware_available = False
-        logger.warning("RPi.GPIO not available, using simulated driver")
+        logger.warning("RPi.GPIO not available, using mock driver")
     
-    if not hardware_available or config.get("simulation_mode", False):
-        return SimulatedMatrixDriver(config)
+    # Check if we're on a Raspberry Pi
+    is_raspberry_pi = platform.machine().startswith('arm') or platform.machine().startswith('aarch')
+    
+    # Use mock driver if not on Pi or simulation mode is enabled
+    if not hardware_available or not is_raspberry_pi or config.get("simulation_mode", False):
+        try:
+            from .mock_driver import MockDriver
+            logger.info("Using MockDriver for development/testing")
+            return MockDriver(config)
+        except ImportError:
+            logger.warning("MockDriver not available, falling back to SimulatedMatrixDriver")
+            return SimulatedMatrixDriver(config)
     
     if matrix_type == "hub75":
         # Prefer the newer controller-based driver; fall back to the legacy
@@ -230,13 +241,21 @@ def create_matrix_driver(config) -> MatrixDriver:
                 logger.error(
                     "Failed to import legacy HUB75 driver: %s", e2
                 )
-                logger.warning("Falling back to simulated driver")
-                return SimulatedMatrixDriver(config)
+                logger.warning("Falling back to mock driver")
+                try:
+                    from .mock_driver import MockDriver
+                    return MockDriver(config)
+                except ImportError:
+                    return SimulatedMatrixDriver(config)
     else:
         try:
             from .ws2811_driver import WS2811Driver
             return WS2811Driver(config)
         except ImportError as e:
             logger.error(f"Failed to import WS2811 driver: {e}")
-            logger.warning("Falling back to simulated driver")
-            return SimulatedMatrixDriver(config)
+            logger.warning("Falling back to mock driver")
+            try:
+                from .mock_driver import MockDriver
+                return MockDriver(config)
+            except ImportError:
+                return SimulatedMatrixDriver(config)

@@ -250,16 +250,16 @@
         }
 
         .tab {
-            padding: 10px 20px;
-            background: var(--background);
+            padding: 8px 16px;
+            background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: 8px 8px 0 0;
+            border-radius: 8px;
             cursor: pointer;
-            transition: all 0.2s;
         }
 
         .tab.active {
             background: var(--primary);
+            color: white;
             border-color: var(--primary);
         }
 
@@ -271,67 +271,74 @@
             display: block;
         }
 
-        .advanced-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
+        .info-tooltip {
+            position: relative;
+            display: inline-block;
+            margin-left: 5px;
+            cursor: help;
+            color: var(--text-muted);
         }
 
-        .animation-list {
-            max-height: 300px;
-            overflow-y: auto;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            background: var(--background);
-        }
-
-        .animation-item {
-            padding: 10px;
-            border-bottom: 1px solid var(--border);
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .animation-item:hover {
+        .info-tooltip:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 100%;
+            top: 50%;
+            transform: translateY(-50%);
             background: var(--surface-hover);
+            padding: 8px 12px;
+            border-radius: 8px;
+            width: max-content;
+            max-width: 300px;
+            z-index: 10;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            font-size: 0.8rem;
+            white-space: normal;
         }
-
-        .animation-item.active {
-            background: var(--primary);
+        
+        /* Status colors */
+        .status-good {
+            color: var(--success);
         }
-
-        .value-display {
-            font-weight: bold;
-            color: var(--accent);
-            min-width: 60px;
-            text-align: right;
+        
+        .status-warning {
+            color: var(--warning);
         }
-
-        .performance-indicator {
-            width: 100%;
-            height: 4px;
-            background: var(--border);
-            border-radius: 2px;
+        
+        .status-error {
+            color: var(--error);
+        }
+        
+        /* Collapsible sections */
+        .collapsible-header {
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .collapsible-content {
+            max-height: 0;
             overflow: hidden;
-            margin-top: 5px;
+            transition: max-height 0.3s ease;
+        }
+        
+        .collapsible-content.expanded {
+            max-height: 2000px;
+        }
+        
+        .chevron::after {
+            content: "▼";
+            font-size: 0.8rem;
+            transition: transform 0.3s;
+        }
+        
+        .chevron.expanded::after {
+            transform: rotate(180deg);
         }
 
-        .performance-bar {
-            height: 100%;
-            background: var(--success);
-            transition: width 0.3s, background 0.3s;
-        }
-
-        .warning { color: var(--warning); }
-        .error { color: var(--error); }
-        .success { color: var(--success); }
-
-        @media (max-width: 1024px) {
+        @media (max-width: 1200px) {
             .container {
-                grid-template-columns: 1fr;
-            }
-            
-            .control-grid {
                 grid-template-columns: 1fr;
             }
         }
@@ -340,415 +347,1190 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎨 LightBox Comprehensive Control</h1>
+            <h1>LightBox HUB75 Comprehensive Control</h1>
             <div class="status">
-                <div class="status-indicator" id="status-indicator"></div>
-                <span id="status-text">Connecting...</span>
+                <div class="status-indicator"></div>
+                <span id="connection-status">Connected</span>
+                <span id="fps-display">FPS: <span id="fps">0</span></span>
+                <span id="refresh-rate-display">Refresh Rate: <span id="refresh-rate">0</span> Hz</span>
             </div>
         </div>
 
         <div class="sidebar">
-            <!-- Performance Metrics -->
-            <section class="section">
-                <h2>⚡ Performance Metrics</h2>
-                <div class="metric-grid">
-                    <div class="metric">
-                        <label>FPS</label>
-                        <span id="fps">--</span>
-                        <div class="performance-indicator">
-                            <div class="performance-bar" id="fps-bar"></div>
-                        </div>
-                    </div>
-                    <div class="metric">
-                        <label>CPU</label>
-                        <span id="cpu">--%</span>
-                        <div class="performance-indicator">
-                            <div class="performance-bar" id="cpu-bar"></div>
-                        </div>
-                    </div>
-                    <div class="metric">
-                        <label>Memory</label>
-                        <span id="memory">-- MB</span>
-                        <div class="performance-indicator">
-                            <div class="performance-bar" id="memory-bar"></div>
-                        </div>
-                    </div>
-                    <div class="metric">
-                        <label>Frame Time</label>
-                        <span id="frame-time">-- ms</span>
-                    </div>
-                    <div class="metric">
-                        <label>Dropped</label>
-                        <span id="dropped">--%</span>
-                    </div>
-                    <div class="metric">
-                        <label>Cache Hit</label>
-                        <span id="cache-hit">--%</span>
-                    </div>
-                </div>
-            </section>
-
-            <!-- System Information -->
-            <section class="section">
-                <h2>🖥️ System Info</h2>
+            <!-- Current Animation -->
+            <div class="section">
+                <h2>Current Animation</h2>
                 <div class="control-group">
-                    <div class="control-row">
-                        <label>Platform:</label>
-                        <span id="platform" class="value-display">--</span>
-                    </div>
-                    <div class="control-row">
-                        <label>Matrix Type:</label>
-                        <span id="matrix-type" class="value-display">--</span>
-                    </div>
-                    <div class="control-row">
-                        <label>Resolution:</label>
-                        <span id="resolution" class="value-display">--</span>
-                    </div>
-                    <div class="control-row">
-                        <label>Optimizations:</label>
-                        <span id="optimizations" class="value-display success">Active</span>
-                    </div>
+                    <label for="animation-select">Animation</label>
+                    <select id="animation-select">
+                        <!-- Will be populated dynamically -->
+                    </select>
                 </div>
-            </section>
+                <div style="margin-top: 15px; display: flex; gap: 10px;">
+                    <button id="btn-apply-animation">Apply</button>
+                    <button id="btn-reset-animation" class="secondary">Reset</button>
+                </div>
+            </div>
 
-            <!-- Quick Actions -->
-            <section class="section">
-                <h2>⚡ Quick Actions</h2>
+            <!-- Animation Controls -->
+            <div class="section">
+                <h2>Animation Controls</h2>
                 <div class="control-group">
-                    <button id="reset-animation">Reset Animation</button>
-                    <button id="clear-cache" class="secondary">Clear Cache</button>
-                    <button id="save-preset">Save Current State</button>
-                    <button id="emergency-stop" class="danger">Emergency Stop</button>
+                    <label for="brightness">Brightness</label>
+                    <div class="control-row">
+                        <input type="range" id="brightness" min="0" max="1" step="0.01" value="0.8">
+                        <span id="brightness-value">80%</span>
+                    </div>
                 </div>
-            </section>
+                <div class="control-group">
+                    <label for="speed">Speed</label>
+                    <div class="control-row">
+                        <input type="range" id="speed" min="0.1" max="5" step="0.1" value="1">
+                        <span id="speed-value">1.0x</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="intensity">Intensity</label>
+                    <div class="control-row">
+                        <input type="range" id="intensity" min="0.1" max="2" step="0.1" value="1">
+                        <span id="intensity-value">1.0x</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="scale">Scale</label>
+                    <div class="control-row">
+                        <input type="range" id="scale" min="0.1" max="5" step="0.1" value="1">
+                        <span id="scale-value">1.0x</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="palette">Color Palette</label>
+                    <select id="palette">
+                        <!-- Will be populated dynamically -->
+                    </select>
+                </div>
+                <div id="palette-preview" style="margin-top: 15px; height: 20px; border-radius: 4px; background: linear-gradient(90deg, red, orange, yellow, green, blue, indigo, violet);"></div>
+            </div>
+
+            <!-- System Actions -->
+            <div class="section">
+                <h2>System Actions</h2>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button id="btn-save-preset">Save Current Preset</button>
+                    <button id="btn-optimize" class="secondary">Optimize Performance</button>
+                    <button id="btn-clear-cache" class="secondary">Clear Cache</button>
+                    <button id="btn-emergency-stop" class="danger">Emergency Stop</button>
+                </div>
+            </div>
         </div>
 
         <div class="main-content">
-            <!-- Basic Controls -->
-            <section class="section">
-                <h2>🎛️ Basic Controls</h2>
-                <div class="control-grid">
-                    <div class="control-group">
-                        <label for="brightness">Brightness</label>
-                        <div class="control-row">
-                            <input type="range" id="brightness" min="0" max="100" value="80">
-                            <span id="brightness-value" class="value-display">80%</span>
-                        </div>
+            <!-- Performance Metrics -->
+            <div class="section">
+                <h2>Performance Metrics</h2>
+                <div class="metric-grid">
+                    <div class="metric">
+                        <label>FPS</label>
+                        <span id="metric-fps">0</span>
                     </div>
-
-                    <div class="control-group">
-                        <label for="speed">Animation Speed</label>
-                        <div class="control-row">
-                            <input type="range" id="speed" min="10" max="500" value="100">
-                            <span id="speed-value" class="value-display">1.0x</span>
-                        </div>
+                    <div class="metric">
+                        <label>Frame Count</label>
+                        <span id="metric-frame-count">0</span>
                     </div>
-
-                    <div class="control-group">
-                        <label for="animation">Animation Program</label>
-                        <select id="animation">
-                            <option value="">Loading...</option>
-                        </select>
+                    <div class="metric">
+                        <label>Refresh Rate</label>
+                        <span id="metric-refresh-rate">0 Hz</span>
                     </div>
-
-                    <div class="control-group">
-                        <label for="palette">Color Palette</label>
-                        <select id="palette">
-                            <option value="rainbow">Rainbow</option>
-                            <option value="fire">Fire</option>
-                            <option value="ocean">Ocean</option>
-                            <option value="forest">Forest</option>
-                            <option value="cosmic">Cosmic</option>
-                            <option value="sunset">Sunset</option>
-                        </select>
+                    <div class="metric">
+                        <label>CPU Usage</label>
+                        <span id="metric-cpu">0%</span>
+                    </div>
+                    <div class="metric">
+                        <label>Memory</label>
+                        <span id="metric-memory">0 MB</span>
+                    </div>
+                    <div class="metric">
+                        <label>Uptime</label>
+                        <span id="metric-uptime">0:00:00</span>
                     </div>
                 </div>
-            </section>
+            </div>
 
-            <!-- Hardware Configuration -->
-            <section class="section">
-                <h2>⚙️ Hardware Configuration</h2>
-                
+            <!-- Hardware Configuration Tabs -->
+            <div class="section">
+                <h2>Hardware Configuration</h2>
                 <div class="tabs">
-                    <div class="tab active" data-tab="performance">Performance</div>
-                    <div class="tab" data-tab="ws2811">WS2811</div>
-                    <div class="tab" data-tab="hub75">HUB75</div>
-                    <div class="tab" data-tab="platform">Platform</div>
+                    <div class="tab active" data-tab="display-config">Display</div>
+                    <div class="tab" data-tab="pwm-config">PWM Settings</div>
+                    <div class="tab" data-tab="performance-config">Performance</div>
+                    <div class="tab" data-tab="optimization-config">Optimization</div>
+                    <div class="tab" data-tab="system-config">System</div>
+                </div>
+
+                <!-- Display Configuration -->
+                <div class="tab-content active" id="display-config">
+                    <h3>Matrix Dimensions</h3>
+                    <div class="control-grid">
+                        <div class="control-group">
+                            <label for="matrix-rows">Rows</label>
+                            <input type="number" id="matrix-rows" min="16" max="128" value="64">
+                        </div>
+                        <div class="control-group">
+                            <label for="matrix-cols">Columns</label>
+                            <input type="number" id="matrix-cols" min="16" max="128" value="64">
+                        </div>
+                        <div class="control-group">
+                            <label for="chain-length">Chain Length</label>
+                            <input type="number" id="chain-length" min="1" max="8" value="1">
+                            <small class="info-tooltip" data-tooltip="Number of panels daisy-chained horizontally">ℹ️</small>
+                        </div>
+                        <div class="control-group">
+                            <label for="parallel">Parallel Chains</label>
+                            <input type="number" id="parallel" min="1" max="3" value="1">
+                            <small class="info-tooltip" data-tooltip="Number of parallel chains (rare on Pi 3B+)">ℹ️</small>
+                        </div>
+                    </div>
+
+                    <h3>Panel Configuration</h3>
+                    <div class="control-grid">
+                        <div class="control-group">
+                            <label for="hardware-mapping">Hardware Mapping</label>
+                            <select id="hardware-mapping">
+                                <option value="adafruit-hat">Adafruit HAT/Bonnet</option>
+                                <option value="regular">Regular GPIO mapping</option>
+                                <option value="adafruit-hat-pwm">Adafruit HAT with PWM hardware mod</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label for="scan-mode">Scan Mode</label>
+                            <select id="scan-mode">
+                                <option value="0">Progressive (0)</option>
+                                <option value="1">Interlaced (1)</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label for="row-address-type">Row Address Type</label>
+                            <select id="row-address-type">
+                                <option value="0">Default (0)</option>
+                                <option value="1">AB-addressing (1)</option>
+                                <option value="2">Direct row select (2)</option>
+                                <option value="3">ABC-addressing (3)</option>
+                                <option value="4">ABC Shift + DE (4)</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label for="multiplexing">Multiplexing</label>
+                            <select id="multiplexing">
+                                <option value="0">Default (0)</option>
+                                <option value="1">Stripe (1)</option>
+                                <option value="2">Checkered (2)</option>
+                                <option value="3">Spiral (3)</option>
+                                <option value="4">ZStripe (4)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PWM Settings Tab -->
+                <div class="tab-content" id="pwm-config">
+                    <h3>PWM Configuration</h3>
+                    <div class="control-grid">
+                        <div class="control-group">
+                            <label for="pwm-bits">PWM Bits</label>
+                            <div class="control-row">
+                                <input type="range" id="pwm-bits" min="1" max="11" step="1" value="11">
+                                <span id="pwm-bits-value">11</span>
+                            </div>
+                            <small class="info-tooltip" data-tooltip="Higher values (11): Better color depth but slower refresh. Lower values (7): Less color depth but faster refresh.">ℹ️</small>
+                        </div>
+                        <div class="control-group">
+                            <label for="pwm-lsb-ns">PWM LSB Nanoseconds</label>
+                            <div class="control-row">
+                                <input type="range" id="pwm-lsb-ns" min="50" max="300" step="10" value="130">
+                                <span id="pwm-lsb-ns-value">130</span>
+                            </div>
+                            <small class="info-tooltip" data-tooltip="Fine-tunes PWM timing. Lower values: faster refresh but less stable. Higher values: more stable but slower refresh.">ℹ️</small>
+                        </div>
+                        <div class="control-group">
+                            <label for="pwm-dither-bits">PWM Dither Bits</label>
+                            <div class="control-row">
+                                <input type="range" id="pwm-dither-bits" min="0" max="2" step="1" value="0">
+                                <span id="pwm-dither-bits-value">0</span>
+                            </div>
+                            <small class="info-tooltip" data-tooltip="Spreads color error over frames to improve color smoothness. Higher values (1-2) improve color accuracy but may introduce noise.">ℹ️</small>
+                        </div>
+                    </div>
+
+                    <h3>Hardware PWM</h3>
+                    <div class="control-grid">
+                        <div class="control-group">
+                            <label for="hardware-pwm">Hardware PWM Mode</label>
+                            <select id="hardware-pwm">
+                                <option value="auto">Auto-detect (Recommended)</option>
+                                <option value="on">Force On</option>
+                                <option value="off">Force Off</option>
+                            </select>
+                            <small class="info-tooltip" data-tooltip="Hardware PWM requires soldering a jumper between GPIO4 and GPIO18. It eliminates flicker by using hardware pulse generation.">ℹ️</small>
+                        </div>
+                        <div class="control-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="hardware-pwm-mod">
+                                <label for="hardware-pwm-mod">Hardware PWM mod installed</label>
+                            </div>
+                            <small class="info-tooltip" data-tooltip="Check this if you've physically connected GPIO4 to GPIO18 with a jumper wire on the HAT/Bonnet.">ℹ️</small>
+                        </div>
+                        <div class="control-group">
+                            <div id="hardware-pwm-status">
+                                <span>PWM Status: </span>
+                                <span id="hardware-pwm-status-value" class="status-warning">Not Detected</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Performance Tab -->
-                <div class="tab-content active" id="performance-tab">
+                <div class="tab-content" id="performance-config">
+                    <h3>Refresh & Timing</h3>
                     <div class="control-grid">
+                        <div class="control-group">
+                            <label for="gpio-slowdown">GPIO Slowdown</label>
+                            <div class="control-row">
+                                <input type="range" id="gpio-slowdown" min="0" max="6" step="1" value="4">
+                                <span id="gpio-slowdown-value">4</span>
+                            </div>
+                            <small class="info-tooltip" data-tooltip="Adjusts GPIO timing for different Pi models. Pi 1: Use value 1. Pi 2/Zero: Use value 2. Pi 3/4: Use value 4 (recommended).">ℹ️</small>
+                        </div>
+                        <div class="control-group">
+                            <label for="limit-refresh">Limit Refresh Rate (Hz)</label>
+                            <div class="control-row">
+                                <input type="range" id="limit-refresh" min="0" max="200" step="10" value="120">
+                                <span id="limit-refresh-value">120 Hz</span>
+                            </div>
+                            <small class="info-tooltip" data-tooltip="Setting a fixed refresh rate can stabilize animations. 0 = no limit, 120 = limit to 120 Hz (recommended for Pi 3B+).">ℹ️</small>
+                        </div>
                         <div class="control-group">
                             <label for="target-fps">Target FPS</label>
                             <div class="control-row">
-                                <input type="range" id="target-fps" min="10" max="120" value="30">
-                                <span id="target-fps-value" class="value-display">30</span>
+                                <input type="range" id="target-fps" min="15" max="60" step="1" value="30">
+                                <span id="target-fps-value">30</span>
                             </div>
                         </div>
+                    </div>
 
+                    <h3>CPU Optimization</h3>
+                    <div class="control-grid">
                         <div class="control-group">
-                            <label for="buffer-pool-size">Buffer Pool Size</label>
-                            <input type="number" id="buffer-pool-size" min="1" max="10" value="3">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="cpu-isolation" checked>
+                                <label for="cpu-isolation">Enable CPU isolation</label>
+                            </div>
+                            <small class="info-tooltip" data-tooltip="Dedicates a CPU core to the LED matrix refresh. Requires 'isolcpus=3' in /boot/cmdline.txt for Pi 3/4.">ℹ️</small>
                         </div>
-
                         <div class="control-group">
-                            <label for="cache-size">Cache Size</label>
-                            <input type="number" id="cache-size" min="100" max="10000" value="1000">
+                            <div id="cpu-isolation-status">
+                                <span>CPU Isolation: </span>
+                                <span id="cpu-isolation-status-value" class="status-warning">Not Detected</span>
+                            </div>
                         </div>
+                    </div>
 
+                    <h3>Rendering Options</h3>
+                    <div class="control-grid">
                         <div class="control-group">
-                            <label for="stats-interval">Stats Interval (s)</label>
-                            <input type="number" id="stats-interval" min="1" max="60" value="10">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="double-buffering" checked>
+                                <label for="double-buffering">Double Buffering</label>
+                            </div>
+                            <small class="info-tooltip" data-tooltip="Uses SwapOnVSync for tear-free animation. Highly recommended to keep enabled.">ℹ️</small>
                         </div>
+                        <div class="control-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="show-refresh-rate">
+                                <label for="show-refresh-rate">Show Refresh Rate</label>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="fixed-frame-time" checked>
+                                <label for="fixed-frame-time">Fixed Frame Time</label>
+                            </div>
+                            <small class="info-tooltip" data-tooltip="Ensures consistent frame timing for smoother animation">ℹ️</small>
+                        </div>
+                    </div>
+                </div>
 
+                <!-- System Config Tab -->
+                <div class="tab-content" id="system-config">
+                    <h3>System Settings</h3>
+                    <div class="control-grid">
+                        <div class="control-group">
+                            <label for="log-level">Log Level</label>
+                            <select id="log-level">
+                                <option value="DEBUG">Debug</option>
+                                <option value="INFO" selected>Info</option>
+                                <option value="WARNING">Warning</option>
+                                <option value="ERROR">Error</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="auto-save-presets" checked>
+                                <label for="auto-save-presets">Auto-Save Presets</label>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="headless-mode" checked>
+                                <label for="headless-mode">Headless Mode</label>
+                            </div>
+                            <small class="info-tooltip" data-tooltip="Optimizes for running without a desktop GUI. Recommended for best performance.">ℹ️</small>
+                        </div>
+                        <div class="control-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="os-optimization" checked>
+                                <label for="os-optimization">OS Optimization</label>
+                            </div>
+                            <small class="info-tooltip" data-tooltip="Applies system-level optimizations for LED matrix performance">ℹ️</small>
+                        </div>
+                    </div>
+
+                    <h3>Hardware Components</h3>
+                    <div class="control-grid">
+                        <div class="control-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="buttons-enabled" checked>
+                                <label for="buttons-enabled">Enable Button Controls</label>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="oled-enabled" checked>
+                                <label for="oled-enabled">Enable OLED Display</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 20px;">
+                        <button id="btn-save-config">Save Configuration</button>
+                        <button id="btn-restart" class="secondary">Restart System</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Optimization Controls Tab -->
+            <div class="tab-content" id="optimization-config">
+                <h3>Performance Optimization</h3>
+                <div class="control-grid">
+                    <div class="control-group">
                         <div class="checkbox-group">
                             <input type="checkbox" id="enable-caching" checked>
                             <label for="enable-caching">Enable Caching</label>
                         </div>
-
+                        <small class="info-tooltip" data-tooltip="Enables frame and calculation caching for better performance">ℹ️</small>
+                    </div>
+                    <div class="control-group">
+                        <label for="cache-size">Cache Size</label>
+                        <div class="control-row">
+                            <input type="range" id="cache-size" min="100" max="10000" step="100" value="1000">
+                            <span id="cache-size-value">1000</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Number of cache entries to store. Higher values use more memory but improve performance">ℹ️</small>
+                    </div>
+                    <div class="control-group">
+                        <label for="buffer-pool-size">Buffer Pool Size</label>
+                        <div class="control-row">
+                            <input type="range" id="buffer-pool-size" min="2" max="10" step="1" value="4">
+                            <span id="buffer-pool-size-value">4</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Number of frame buffers to allocate. More buffers reduce allocation overhead">ℹ️</small>
+                    </div>
+                    <div class="control-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="adaptive-fps" checked>
+                            <label for="adaptive-fps">Adaptive FPS</label>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Automatically adjusts frame rate based on system performance">ℹ️</small>
+                    </div>
+                    <div class="control-group">
+                        <label for="frame-skip">Frame Skip</label>
+                        <div class="control-row">
+                            <input type="range" id="frame-skip" min="0" max="5" step="1" value="0">
+                            <span id="frame-skip-value">0</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Skip frames when system is overloaded. Higher values drop more frames">ℹ️</small>
+                    </div>
+                    <div class="control-group">
                         <div class="checkbox-group">
                             <input type="checkbox" id="enable-profiling">
                             <label for="enable-profiling">Enable Profiling</label>
                         </div>
+                        <small class="info-tooltip" data-tooltip="Enables performance profiling and detailed timing metrics">ℹ️</small>
                     </div>
                 </div>
 
-                <!-- WS2811 Tab -->
-                <div class="tab-content" id="ws2811-tab">
+                <h3>Animation Optimization</h3>
+                <div class="control-grid">
+                    <div class="control-group">
+                        <label for="complexity">Complexity</label>
+                        <div class="control-row">
+                            <input type="range" id="complexity" min="1" max="10" step="1" value="5">
+                            <span id="complexity-value">5</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Animation complexity level. Higher values create more detailed but slower animations">ℹ️</small>
+                    </div>
+                    <div class="control-group">
+                        <label for="density">Density</label>
+                        <div class="control-row">
+                            <input type="range" id="density" min="0.1" max="1.0" step="0.1" value="0.8">
+                            <span id="density-value">0.8</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Effect density. Lower values reduce computational load">ℹ️</small>
+                    </div>
+                    <div class="control-group">
+                        <label for="motion-blur">Motion Blur</label>
+                        <div class="control-row">
+                            <input type="range" id="motion-blur" min="0.0" max="1.0" step="0.1" value="0.2">
+                            <span id="motion-blur-value">0.2</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Motion blur amount. Higher values create smoother motion but increase processing">ℹ️</small>
+                    </div>
+                    <div class="control-group">
+                        <label for="fade-rate">Fade Rate</label>
+                        <div class="control-row">
+                            <input type="range" id="fade-rate" min="0.01" max="1.0" step="0.01" value="0.1">
+                            <span id="fade-rate-value">0.1</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Fade/decay speed for trail effects. Higher values create shorter trails">ℹ️</small>
+                    </div>
+                    <div class="control-group">
+                        <label for="transition-speed">Transition Speed</label>
+                        <div class="control-row">
+                            <input type="range" id="transition-speed" min="0.1" max="5.0" step="0.1" value="1.0">
+                            <span id="transition-speed-value">1.0</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Speed of transitions between animation states">ℹ️</small>
+                    </div>
+                    <div class="control-group">
+                        <label for="rotation-speed">Rotation Speed</label>
+                        <div class="control-row">
+                            <input type="range" id="rotation-speed" min="-5.0" max="5.0" step="0.1" value="0.0">
+                            <span id="rotation-speed-value">0.0</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Pattern rotation speed. Negative values rotate counter-clockwise">ℹ️</small>
+                    </div>
+                </div>
+
+                <h3>Visual Effects Optimization</h3>
+                <div class="control-grid">
+                    <div class="control-group">
+                        <label for="blur-radius">Blur Radius</label>
+                        <div class="control-row">
+                            <input type="range" id="blur-radius" min="0" max="10" step="1" value="0">
+                            <span id="blur-radius-value">0</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Blur effect radius. Higher values create more blur but reduce performance">ℹ️</small>
+                    </div>
+                    <div class="control-group">
+                        <label for="edge-fade">Edge Fade</label>
+                        <div class="control-row">
+                            <input type="range" id="edge-fade" min="0.0" max="1.0" step="0.1" value="0.0">
+                            <span id="edge-fade-value">0.0</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Fade effect at display edges. Higher values create softer edges">ℹ️</small>
+                    </div>
+                    <div class="control-group">
+                        <label for="center-focus">Center Focus</label>
+                        <div class="control-row">
+                            <input type="range" id="center-focus" min="0.0" max="1.0" step="0.1" value="0.0">
+                            <span id="center-focus-value">0.0</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Brightness boost in center of display. Higher values emphasize center">ℹ️</small>
+                    </div>
+                    <div class="control-group">
+                        <label for="vignette">Vignette</label>
+                        <div class="control-row">
+                            <input type="range" id="vignette" min="0.0" max="1.0" step="0.1" value="0.0">
+                            <span id="vignette-value">0.0</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Vignette effect strength. Higher values darken edges more">ℹ️</small>
+                    </div>
+                    <div class="control-group">
+                        <label for="strobe-rate">Strobe Rate</label>
+                        <div class="control-row">
+                            <input type="range" id="strobe-rate" min="0" max="30" step="1" value="0">
+                            <span id="strobe-rate-value">0 Hz</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Strobe frequency. 0 disables strobe. Higher values create faster strobing">ℹ️</small>
+                    </div>
+                    <div class="control-group">
+                        <label for="pulse-speed">Pulse Speed</label>
+                        <div class="control-row">
+                            <input type="range" id="pulse-speed" min="0.1" max="10.0" step="0.1" value="1.0">
+                            <span id="pulse-speed-value">1.0</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Pulsing effect speed. Higher values create faster pulsing">ℹ️</small>
+                    </div>
+                </div>
+
+                <h3>Color Optimization</h3>
+                <div class="control-grid">
+                    <div class="control-group">
+                        <label for="gamma">Gamma</label>
+                        <div class="control-row">
+                            <input type="range" id="gamma" min="1.0" max="3.0" step="0.1" value="2.2">
+                            <span id="gamma-value">2.2</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Gamma correction curve. 2.2 is standard for most displays">ℹ️</small>
+                    </div>
+                    <div class="control-group">
+                        <label for="contrast">Contrast</label>
+                        <div class="control-row">
+                            <input type="range" id="contrast" min="0.5" max="2.0" step="0.1" value="1.0">
+                            <span id="contrast-value">1.0</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Contrast adjustment. Higher values increase contrast">ℹ️</small>
+                    </div>
+                    <div class="control-group">
+                        <label for="saturation">Saturation</label>
+                        <div class="control-row">
+                            <input type="range" id="saturation" min="0.0" max="2.0" step="0.1" value="1.0">
+                            <span id="saturation-value">1.0</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Color saturation. Higher values make colors more vivid">ℹ️</small>
+                    </div>
+                    <div class="control-group">
+                        <label for="hue-shift">Hue Shift</label>
+                        <div class="control-row">
+                            <input type="range" id="hue-shift" min="0.0" max="1.0" step="0.01" value="0.0">
+                            <span id="hue-shift-value">0.0</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Global hue rotation. Changes overall color tone">ℹ️</small>
+                    </div>
+                    <div class="control-group">
+                        <label for="color-temperature">Color Temperature</label>
+                        <div class="control-row">
+                            <input type="range" id="color-temperature" min="2000" max="10000" step="100" value="6500">
+                            <span id="color-temperature-value">6500K</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Color temperature in Kelvin. Lower values are warmer (redder), higher values are cooler (bluer)">ℹ️</small>
+                    </div>
+                </div>
+
+                <h3>Advanced Optimization</h3>
+                <div class="control-grid">
+                    <div class="control-group">
+                        <label for="kaleidoscope-segments">Kaleidoscope Segments</label>
+                        <div class="control-row">
+                            <input type="range" id="kaleidoscope-segments" min="2" max="16" step="1" value="6">
+                            <span id="kaleidoscope-segments-value">6</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Number of symmetry segments for kaleidoscope effects">ℹ️</small>
+                    </div>
+                    <div class="control-group">
+                        <label for="zoom-speed">Zoom Speed</label>
+                        <div class="control-row">
+                            <input type="range" id="zoom-speed" min="0.5" max="2.0" step="0.1" value="1.0">
+                            <span id="zoom-speed-value">1.0</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Zoom in/out speed for zoom effects">ℹ️</small>
+                    </div>
+                    <div class="control-group">
+                        <label for="stats-interval">Stats Interval</label>
+                        <div class="control-row">
+                            <input type="range" id="stats-interval" min="1" max="60" step="1" value="5">
+                            <span id="stats-interval-value">5s</span>
+                        </div>
+                        <small class="info-tooltip" data-tooltip="Performance statistics update interval in seconds">ℹ️</small>
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button id="btn-apply-optimization">Apply Optimization</button>
+                    <button id="btn-reset-optimization" class="secondary">Reset to Defaults</button>
+                    <button id="btn-performance-preset" class="secondary">Performance Preset</button>
+                    <button id="btn-quality-preset" class="secondary">Quality Preset</button>
+                    <button id="btn-balanced-preset" class="secondary">Balanced Preset</button>
+                </div>
+            </div>
+
+            <!-- Animation Parameters -->
+            <div class="section">
+                <h2 class="collapsible-header">
+                    <span>Animation Parameters</span>
+                    <span class="chevron"></span>
+                </h2>
+                <div class="collapsible-content">
+                    <div class="control-grid" id="animation-params">
+                        <!-- Will be populated dynamically based on current animation -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visual Effects Customization -->
+            <div class="section">
+                <h2 class="collapsible-header">
+                    <span>Visual Effects Customization</span>
+                    <span class="chevron"></span>
+                </h2>
+                <div class="collapsible-content">
+                    <h3>Wave Parameters</h3>
                     <div class="control-grid">
                         <div class="control-group">
-                            <label for="ws2811-pixels">Number of Pixels</label>
-                            <input type="number" id="ws2811-pixels" min="1" max="10000" value="100">
-                        </div>
-
-                        <div class="control-group">
-                            <label for="ws2811-width">Matrix Width</label>
-                            <input type="number" id="ws2811-width" min="1" max="200" value="10">
-                        </div>
-
-                        <div class="control-group">
-                            <label for="ws2811-height">Matrix Height</label>
-                            <input type="number" id="ws2811-height" min="1" max="200" value="10">
-                        </div>
-
-                        <div class="control-group">
-                            <label for="ws2811-pin">Data Pin</label>
-                            <select id="ws2811-pin">
-                                <option value="D12">D12 (GPIO18)</option>
-                                <option value="D18">D18 (GPIO24)</option>
-                                <option value="D21">D21 (GPIO27)</option>
-                            </select>
-                        </div>
-
-                        <div class="control-group">
-                            <label for="ws2811-gamma">Gamma Correction</label>
+                            <label for="wave-frequency">Wave Frequency</label>
                             <div class="control-row">
-                                <input type="range" id="ws2811-gamma" min="1.0" max="3.0" step="0.1" value="2.2">
-                                <span id="ws2811-gamma-value" class="value-display">2.2</span>
+                                <input type="range" id="wave-frequency" min="0.1" max="5.0" step="0.1" value="1.0">
+                                <span id="wave-frequency-value">1.0</span>
                             </div>
                         </div>
-
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="ws2811-serpentine" checked>
-                            <label for="ws2811-serpentine">Serpentine Layout</label>
+                        <div class="control-group">
+                            <label for="wave-amplitude">Wave Amplitude</label>
+                            <div class="control-row">
+                                <input type="range" id="wave-amplitude" min="0.1" max="2.0" step="0.1" value="1.0">
+                                <span id="wave-amplitude-value">1.0</span>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label for="wave-speed">Wave Speed</label>
+                            <div class="control-row">
+                                <input type="range" id="wave-speed" min="0.1" max="5.0" step="0.1" value="1.0">
+                                <span id="wave-speed-value">1.0</span>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- HUB75 Tab -->
-                <div class="tab-content" id="hub75-tab">
+                    <h3>Particle Effects</h3>
                     <div class="control-grid">
                         <div class="control-group">
-                            <label for="hub75-rows">Panel Rows</label>
-                            <select id="hub75-rows">
-                                <option value="32">32</option>
-                                <option value="64" selected>64</option>
-                                <option value="128">128</option>
-                            </select>
+                            <label for="particle-count">Particle Count</label>
+                            <div class="control-row">
+                                <input type="range" id="particle-count" min="10" max="500" step="10" value="100">
+                                <span id="particle-count-value">100</span>
+                            </div>
                         </div>
-
                         <div class="control-group">
-                            <label for="hub75-cols">Panel Columns</label>
-                            <select id="hub75-cols">
-                                <option value="32">32</option>
-                                <option value="64" selected>64</option>
-                                <option value="128">128</option>
-                            </select>
+                            <label for="particle-density">Particle Density</label>
+                            <div class="control-row">
+                                <input type="range" id="particle-density" min="0.1" max="2.0" step="0.1" value="1.0">
+                                <span id="particle-density-value">1.0</span>
+                            </div>
                         </div>
-
                         <div class="control-group">
-                            <label for="hub75-chain">Chain Length</label>
-                            <input type="number" id="hub75-chain" min="1" max="32" value="1">
-                        </div>
-
-                        <div class="control-group">
-                            <label for="hub75-parallel">Parallel Chains</label>
-                            <input type="number" id="hub75-parallel" min="1" max="8" value="1">
-                        </div>
-
-                        <div class="control-group">
-                            <label for="hub75-pwm-bits">PWM Bits</label>
-                            <select id="hub75-pwm-bits">
-                                <option value="8">8</option>
-                                <option value="9">9</option>
-                                <option value="10">10</option>
-                                <option value="11" selected>11</option>
-                                <option value="12">12</option>
-                            </select>
-                        </div>
-
-                        <div class="control-group">
-                            <label for="hub75-pwm-lsb">PWM LSB Nanoseconds</label>
-                            <input type="number" id="hub75-pwm-lsb" min="50" max="1000" value="130">
-                        </div>
-
-                        <div class="control-group">
-                            <label for="hub75-slowdown">GPIO Slowdown</label>
-                            <input type="number" id="hub75-slowdown" min="0" max="10" value="4">
-                        </div>
-
-                        <div class="control-group">
-                            <label for="hub75-scan-mode">Scan Mode</label>
-                            <select id="hub75-scan-mode">
-                                <option value="0" selected>Progressive</option>
-                                <option value="1">Interlaced</option>
-                                <option value="2">Row Mode</option>
-                            </select>
-                        </div>
-
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="hub75-hardware-pwm" checked>
-                            <label for="hub75-hardware-pwm">Hardware PWM (GPIO4-18 Bridge)</label>
-                        </div>
-
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="hub75-cpu-isolation">
-                            <label for="hub75-cpu-isolation">CPU Isolation (isolcpus=3)</label>
+                            <label for="particle-size">Particle Size</label>
+                            <div class="control-row">
+                                <input type="range" id="particle-size" min="1" max="10" step="1" value="2">
+                                <span id="particle-size-value">2</span>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Platform Tab -->
-                <div class="tab-content" id="platform-tab">
+                    <h3>Pattern Parameters</h3>
                     <div class="control-grid">
                         <div class="control-group">
-                            <label for="cpu-governor">CPU Governor</label>
-                            <select id="cpu-governor">
-                                <option value="powersave">Power Save</option>
-                                <option value="ondemand">On Demand</option>
-                                <option value="performance" selected>Performance</option>
-                            </select>
+                            <label for="pattern-complexity">Pattern Complexity</label>
+                            <div class="control-row">
+                                <input type="range" id="pattern-complexity" min="0.1" max="3.0" step="0.1" value="1.0">
+                                <span id="pattern-complexity-value">1.0</span>
+                            </div>
                         </div>
-
                         <div class="control-group">
-                            <label for="gpu-memory">GPU Memory Split (MB)</label>
-                            <select id="gpu-memory">
-                                <option value="16" selected>16</option>
-                                <option value="32">32</option>
-                                <option value="64">64</option>
-                                <option value="128">128</option>
-                            </select>
+                            <label for="pattern-scale">Pattern Scale</label>
+                            <div class="control-row">
+                                <input type="range" id="pattern-scale" min="0.1" max="5.0" step="0.1" value="1.0">
+                                <span id="pattern-scale-value">1.0</span>
+                            </div>
                         </div>
-
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="enable-overclocking">
-                            <label for="enable-overclocking">Enable Overclocking (Pi 3B+/4 only)</label>
-                        </div>
-
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="disable-bluetooth">
-                            <label for="disable-bluetooth">Disable Bluetooth (Performance)</label>
-                        </div>
-
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="disable-wifi">
-                            <label for="disable-wifi">Disable WiFi (Performance)</label>
-                        </div>
-
-                        <div class="checkbox-group">
-                            <input type="checkbox" id="enable-spi">
-                            <label for="enable-spi">Enable SPI</label>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Advanced Animation Controls -->
-            <section class="section">
-                <h2>🎨 Advanced Animation Controls</h2>
-                <div class="advanced-grid">
-                    <div class="control-group">
-                        <h3>Animation Library</h3>
-                        <div class="animation-list" id="animation-list">
-                            <!-- Populated by JavaScript -->
+                        <div class="control-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="effect-layering">
+                                <label for="effect-layering">Enable Effect Layering</label>
+                            </div>
+                            <small class="info-tooltip" data-tooltip="Allows multiple effects to run concurrently">ℹ️</small>
                         </div>
                     </div>
 
-                    <div class="control-group">
-                        <h3>Animation Parameters</h3>
-                        <div id="animation-params">
-                            <!-- Dynamically populated -->
-                        </div>
-                    </div>
-
-                    <div class="control-group">
-                        <h3>Color Controls</h3>
+                    <h3>Color Controls</h3>
+                    <div class="control-grid">
                         <div class="control-group">
                             <label for="hue-shift">Hue Shift</label>
                             <div class="control-row">
-                                <input type="range" id="hue-shift" min="0" max="360" value="0">
-                                <span id="hue-shift-value" class="value-display">0°</span>
+                                <input type="range" id="hue-shift" min="0" max="1" step="0.01" value="0">
+                                <span id="hue-shift-value">0</span>
                             </div>
                         </div>
-
                         <div class="control-group">
                             <label for="saturation">Saturation</label>
                             <div class="control-row">
-                                <input type="range" id="saturation" min="0" max="200" value="100">
-                                <span id="saturation-value" class="value-display">100%</span>
+                                <input type="range" id="saturation" min="0" max="1" step="0.01" value="0.9">
+                                <span id="saturation-value">0.9</span>
                             </div>
                         </div>
-
                         <div class="control-group">
-                            <label for="contrast">Contrast</label>
+                            <label for="gamma">Gamma Correction</label>
                             <div class="control-row">
-                                <input type="range" id="contrast" min="50" max="200" value="100">
-                                <span id="contrast-value" class="value-display">100%</span>
+                                <input type="range" id="gamma" min="1.0" max="3.0" step="0.1" value="2.2">
+                                <span id="gamma-value">2.2</span>
                             </div>
                         </div>
                     </div>
                 </div>
-            </section>
+            </div>
 
-            <!-- Presets Management -->
-            <section class="section">
-                <h2>💾 Presets & Profiles</h2>
-                <div class="control-grid">
-                    <div class="control-group">
-                        <label for="preset-list">Load Preset</label>
-                        <select id="preset-list">
-                            <option value="">Select preset...</option>
-                        </select>
+            <!-- Text Controls -->
+            <div class="section">
+                <h2 class="collapsible-header">
+                    <span>Text Controls</span>
+                    <span class="chevron"></span>
+                </h2>
+                <div class="collapsible-content">
+                    <h3>Text Content</h3>
+                    <div class="control-grid">
+                        <div class="control-group">
+                            <label for="text-content">Text Content</label>
+                            <input type="text" id="text-content" placeholder="Enter text to display" value="Hello World">
+                        </div>
+                        <div class="control-group">
+                            <label for="font-selection">Font</label>
+                            <select id="font-selection">
+                                <option value="7x13">7x13 (Default)</option>
+                                <option value="6x10">6x10 (Small)</option>
+                                <option value="9x15">9x15 (Medium)</option>
+                                <option value="10x20">10x20 (Large)</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label for="font-size">Font Size</label>
+                            <div class="control-row">
+                                <input type="range" id="font-size" min="8" max="24" step="1" value="12">
+                                <span id="font-size-value">12</span>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="control-group">
-                        <label for="preset-name">Save New Preset</label>
-                        <input type="text" id="preset-name" placeholder="Enter preset name...">
+                    <h3>Text Animation</h3>
+                    <div class="control-grid">
+                        <div class="control-group">
+                            <label for="text-scroll-speed">Scroll Speed</label>
+                            <div class="control-row">
+                                <input type="range" id="text-scroll-speed" min="0.1" max="5.0" step="0.1" value="1.0">
+                                <span id="text-scroll-speed-value">1.0</span>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label for="text-scroll-direction">Scroll Direction</label>
+                            <select id="text-scroll-direction">
+                                <option value="left">Left to Right</option>
+                                <option value="right">Right to Left</option>
+                                <option value="up">Bottom to Top</option>
+                                <option value="down">Top to Bottom</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="text-wrap">
+                                <label for="text-wrap">Text Wrap</label>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="control-group">
-                        <button id="load-preset">Load Preset</button>
-                        <button id="save-new-preset">Save Preset</button>
-                        <button id="delete-preset" class="danger">Delete Preset</button>
+                    <h3>Text Colors</h3>
+                    <div class="control-grid">
+                        <div class="control-group">
+                            <label for="text-color">Text Color</label>
+                            <input type="color" id="text-color" value="#ffffff">
+                        </div>
+                        <div class="control-group">
+                            <label for="background-color">Background Color</label>
+                            <input type="color" id="background-color" value="#000000">
+                        </div>
+                        <div class="control-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="transparent-background" checked>
+                                <label for="transparent-background">Transparent Background</label>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </section>
+            </div>
+
+            <!-- User Presets -->
+            <div class="section">
+                <h2 class="collapsible-header">
+                    <span>User Presets</span>
+                    <span class="chevron"></span>
+                </h2>
+                <div class="collapsible-content">
+                    <div style="margin-bottom: 15px;">
+                        <input type="text" id="new-preset-name" placeholder="New preset name">
+                        <button id="btn-create-preset">Create Preset</button>
+                    </div>
+                    <div id="presets-list" class="control-grid">
+                        <!-- Will be populated dynamically -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- System Information -->
+            <div class="section">
+                <h2 class="collapsible-header">
+                    <span>System Information</span>
+                    <span class="chevron"></span>
+                </h2>
+                <div class="collapsible-content">
+                    <div class="control-grid">
+                        <div class="control-group">
+                            <label>Raspberry Pi Model</label>
+                            <div id="pi-model">Raspberry Pi 3B+</div>
+                        </div>
+                        <div class="control-group">
+                            <label>Software Version</label>
+                            <div id="software-version">LightBox v2.0</div>
+                        </div>
+                        <div class="control-group">
+                            <label>Driver Version</label>
+                            <div id="driver-version">rpi-rgb-led-matrix</div>
+                        </div>
+                        <div class="control-group">
+                            <label>Network Status</label>
+                            <div id="network-status">Connected (192.168.1.x)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Socket.IO for real-time updates -->
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script src="/static/js/comprehensive.js"></script>
+    <script>
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabId = tab.getAttribute('data-tab');
+                
+                // Update active tab
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Update active content
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+        
+        // Collapsible sections
+        document.querySelectorAll('.collapsible-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const content = header.nextElementSibling;
+                const chevron = header.querySelector('.chevron');
+                
+                content.classList.toggle('expanded');
+                chevron.classList.toggle('expanded');
+            });
+        });
+        
+        // Update value displays for range inputs
+        document.querySelectorAll('input[type="range"]').forEach(slider => {
+            const valueDisplay = document.getElementById(`${slider.id}-value`);
+            if (valueDisplay) {
+                slider.addEventListener('input', () => {
+                    if (slider.id === 'brightness') {
+                        valueDisplay.textContent = `${Math.round(slider.value * 100)}%`;
+                    } else if (slider.id === 'speed' || slider.id === 'scale' || slider.id === 'intensity') {
+                        valueDisplay.textContent = `${slider.value}x`;
+                    } else if (slider.id === 'limit-refresh') {
+                        valueDisplay.textContent = slider.value > 0 ? `${slider.value} Hz` : 'Unlimited';
+                    } else {
+                        valueDisplay.textContent = slider.value;
+                    }
+                });
+            }
+        });
+        
+        // API interaction (placeholder - will be replaced with actual implementation)
+        async function fetchConfig() {
+            try {
+                const response = await fetch('/api/hardware/config');
+                if (response.ok) {
+                    const config = await response.json();
+                    updateUI(config);
+                }
+            } catch (error) {
+                console.error('Failed to fetch config:', error);
+            }
+        }
+        
+        async function updateConfig(config) {
+            try {
+                const response = await fetch('/api/hardware/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Config updated:', result);
+                    alert('Configuration saved successfully!');
+                }
+            } catch (error) {
+                console.error('Failed to update config:', error);
+                alert('Failed to save configuration');
+            }
+        }
+        
+        // Save configuration
+        document.getElementById('btn-save-config').addEventListener('click', () => {
+            const config = {
+                hub75: {
+                    rows: parseInt(document.getElementById('matrix-rows').value),
+                    cols: parseInt(document.getElementById('matrix-cols').value),
+                    chain_length: parseInt(document.getElementById('chain-length').value),
+                    parallel: parseInt(document.getElementById('parallel').value),
+                    hardware_mapping: document.getElementById('hardware-mapping').value,
+                    scan_mode: parseInt(document.getElementById('scan-mode').value),
+                    row_address_type: parseInt(document.getElementById('row-address-type').value),
+                    multiplexing: parseInt(document.getElementById('multiplexing').value),
+                    pwm_bits: parseInt(document.getElementById('pwm-bits').value),
+                    pwm_lsb_nanoseconds: parseInt(document.getElementById('pwm-lsb-ns').value),
+                    pwm_dither_bits: parseInt(document.getElementById('pwm-dither-bits').value),
+                    hardware_pwm: document.getElementById('hardware-pwm').value,
+                    gpio_slowdown: parseInt(document.getElementById('gpio-slowdown').value),
+                    limit_refresh: parseInt(document.getElementById('limit-refresh').value),
+                    show_refresh_rate: document.getElementById('show-refresh-rate').checked
+                },
+                performance: {
+                    cpu_isolation: document.getElementById('cpu-isolation').checked,
+                    use_double_buffering: document.getElementById('double-buffering').checked,
+                    fixed_frame_time: document.getElementById('fixed-frame-time').checked
+                },
+                hardware: {
+                    hardware_pwm_mod: document.getElementById('hardware-pwm-mod').checked,
+                    buttons_enabled: document.getElementById('buttons-enabled').checked,
+                    oled_enabled: document.getElementById('oled-enabled').checked
+                },
+                system: {
+                    log_level: document.getElementById('log-level').value,
+                    auto_save_presets: document.getElementById('auto-save-presets').checked,
+                    headless_mode: document.getElementById('headless-mode').checked,
+                    os_optimization: document.getElementById('os-optimization').checked
+                },
+                target_fps: parseInt(document.getElementById('target-fps').value)
+            };
+            
+            updateConfig(config);
+        });
+        
+        // Optimization control handlers
+        const optimizationControls = [
+            'enable-caching', 'cache-size', 'buffer-pool-size', 'adaptive-fps', 'frame-skip', 'enable-profiling',
+            'complexity', 'density', 'motion-blur', 'fade-rate', 'transition-speed', 'rotation-speed',
+            'blur-radius', 'edge-fade', 'center-focus', 'vignette', 'strobe-rate', 'pulse-speed',
+            'gamma', 'contrast', 'saturation', 'hue-shift', 'color-temperature',
+            'kaleidoscope-segments', 'zoom-speed', 'stats-interval'
+        ];
+        
+        // Add event listeners for optimization controls
+        optimizationControls.forEach(controlId => {
+            const control = document.getElementById(controlId);
+            if (control) {
+                control.addEventListener('input', (e) => {
+                    const valueSpan = document.getElementById(controlId + '-value');
+                    if (valueSpan) {
+                        let value = e.target.value;
+                        // Format specific values
+                        if (controlId === 'strobe-rate') {
+                            value = value + ' Hz';
+                        } else if (controlId === 'color-temperature') {
+                            value = value + 'K';
+                        } else if (controlId === 'stats-interval') {
+                            value = value + 's';
+                        }
+                        valueSpan.textContent = value;
+                    }
+                    
+                    // Send optimization update to server
+                    sendOptimizationUpdate(controlId, e.target.type === 'checkbox' ? e.target.checked : parseFloat(e.target.value));
+                });
+            }
+        });
+        
+        // Apply optimization settings
+        document.getElementById('btn-apply-optimization').addEventListener('click', () => {
+            const optimizationConfig = {};
+            
+            optimizationControls.forEach(controlId => {
+                const control = document.getElementById(controlId);
+                if (control) {
+                    optimizationConfig[controlId] = control.type === 'checkbox' ? control.checked : parseFloat(control.value);
+                }
+            });
+            
+            updateOptimizationConfig(optimizationConfig);
+        });
+        
+        // Reset optimization to defaults
+        document.getElementById('btn-reset-optimization').addEventListener('click', () => {
+            if (confirm('Reset all optimization settings to defaults?')) {
+                resetOptimizationDefaults();
+            }
+        });
+        
+        // Optimization presets
+        document.getElementById('btn-performance-preset').addEventListener('click', () => {
+            applyOptimizationPreset('performance');
+        });
+        
+        document.getElementById('btn-quality-preset').addEventListener('click', () => {
+            applyOptimizationPreset('quality');
+        });
+        
+        document.getElementById('btn-balanced-preset').addEventListener('click', () => {
+            applyOptimizationPreset('balanced');
+        });
+        
+        // Send optimization update to server
+        async function sendOptimizationUpdate(parameter, value) {
+            try {
+                const response = await fetch('/api/optimization/update', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        parameter: parameter,
+                        value: value
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Optimization updated:', result);
+                } else {
+                    console.error('Failed to update optimization:', response.statusText);
+                }
+            } catch (error) {
+                console.error('Failed to send optimization update:', error);
+            }
+        }
+        
+        // Update optimization configuration
+        async function updateOptimizationConfig(config) {
+            try {
+                const response = await fetch('/api/optimization/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Optimization config updated:', result);
+                    alert('Optimization settings applied successfully!');
+                } else {
+                    console.error('Failed to update optimization config:', response.statusText);
+                    alert('Failed to apply optimization settings');
+                }
+            } catch (error) {
+                console.error('Failed to update optimization config:', error);
+                alert('Failed to apply optimization settings');
+            }
+        }
+        
+        // Reset optimization to defaults
+        async function resetOptimizationDefaults() {
+            try {
+                const response = await fetch('/api/optimization/reset', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Optimization reset:', result);
+                    alert('Optimization settings reset to defaults!');
+                    // Reload optimization UI
+                    location.reload();
+                } else {
+                    console.error('Failed to reset optimization:', response.statusText);
+                    alert('Failed to reset optimization settings');
+                }
+            } catch (error) {
+                console.error('Failed to reset optimization:', error);
+                alert('Failed to reset optimization settings');
+            }
+        }
+        
+        // Apply optimization preset
+        async function applyOptimizationPreset(preset) {
+            try {
+                const response = await fetch('/api/optimization/preset', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        preset: preset
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Optimization preset applied:', result);
+                    alert(`${preset.charAt(0).toUpperCase() + preset.slice(1)} preset applied successfully!`);
+                    // Update UI with preset values
+                    updateOptimizationUI(result.config);
+                } else {
+                    console.error('Failed to apply optimization preset:', response.statusText);
+                    alert('Failed to apply optimization preset');
+                }
+            } catch (error) {
+                console.error('Failed to apply optimization preset:', error);
+                alert('Failed to apply optimization preset');
+            }
+        }
+        
+        // Update optimization UI with values
+        function updateOptimizationUI(config) {
+            Object.keys(config).forEach(key => {
+                const control = document.getElementById(key);
+                const valueSpan = document.getElementById(key + '-value');
+                
+                if (control && config[key] !== undefined) {
+                    if (control.type === 'checkbox') {
+                        control.checked = config[key];
+                    } else {
+                        control.value = config[key];
+                    }
+                    
+                    if (valueSpan) {
+                        let value = config[key];
+                        // Format specific values
+                        if (key === 'strobe-rate') {
+                            value = value + ' Hz';
+                        } else if (key === 'color-temperature') {
+                            value = value + 'K';
+                        } else if (key === 'stats-interval') {
+                            value = value + 's';
+                        }
+                        valueSpan.textContent = value;
+                    }
+                }
+            });
+        }
+        
+        // Initialize on load
+        window.addEventListener('load', () => {
+            fetchConfig();
+            
+            // Set interval for updating metrics
+            setInterval(() => {
+                // This would be replaced with real-time data from WebSocket
+                document.getElementById('metric-fps').textContent = Math.floor(Math.random() * 10) + 25;
+                document.getElementById('metric-frame-count').textContent = 
+                    parseInt(document.getElementById('metric-frame-count').textContent || '0') + 30;
+            }, 1000);
+        });
+    </script>
 </body>
 </html>
