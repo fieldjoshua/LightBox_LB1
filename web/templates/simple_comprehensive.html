@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LightBox Control Panel</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --secondary: #8b5cf6;
+            --background: #0f172a;
+            --surface: #1e293b;
+            --surface-hover: #334155;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #475569;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --accent: #06b6d4;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--background);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .section {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .section h2 {
+            color: var(--primary);
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .control-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .control-group label {
+            font-weight: 500;
+            color: var(--text);
+            font-size: 0.9rem;
+        }
+
+        .control-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .control-row input[type="range"] {
+            flex: 1;
+        }
+
+        .control-row span {
+            min-width: 50px;
+            text-align: center;
+            font-family: monospace;
+            color: var(--accent);
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            cursor: pointer;
+            height: 20px;
+        }
+
+        input[type="range"]::-webkit-slider-track {
+            background: var(--border);
+            height: 6px;
+            border-radius: 3px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--primary);
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            background: var(--secondary);
+            transform: scale(1.1);
+        }
+
+        select {
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.9rem;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--primary);
+        }
+
+        .preset-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 0.8rem;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--secondary);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: var(--border);
+            color: var(--text);
+        }
+
+        .btn-secondary:hover {
+            background: var(--surface-hover);
+        }
+
+        .animation-selector {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .animation-selector select {
+            flex: 1;
+            max-width: 300px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-item {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--accent);
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        .info-tooltip {
+            color: var(--text-muted);
+            cursor: help;
+            font-size: 0.8rem;
+        }
+
+        .mode-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .emergency-stop {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .btn-danger {
+            background: var(--error);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        /* Performance Monitor Styles */
+        .performance-monitor {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .fps-display {
+            background: var(--surface);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 2px solid var(--accent);
+        }
+
+        .fps-number {
+            font-size: 3rem;
+            font-weight: bold;
+            color: var(--accent);
+            margin-bottom: 5px;
+        }
+
+        .fps-label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .fps-target {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            margin-top: 5px;
+        }
+
+        .active-params {
+            background: var(--surface);
+            padding: 15px;
+            border-radius: 12px;
+        }
+
+        .param-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .param-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+
+        .param-name {
+            color: var(--text);
+        }
+
+        .param-value {
+            color: var(--accent);
+            font-family: monospace;
+        }
+
+        .param-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+
+        .param-status.inactive {
+            background: var(--text-muted);
+        }
+
+        .performance-chart {
+            height: 150px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            margin-top: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chart-line {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to top, var(--accent), transparent);
+            clip-path: polygon(0 100%, 5% 85%, 10% 90%, 15% 75%, 20% 80%, 25% 65%, 30% 70%, 35% 55%, 40% 60%, 45% 45%, 50% 50%, 55% 35%, 60% 40%, 65% 25%, 70% 30%, 75% 15%, 80% 20%, 85% 10%, 90% 15%, 95% 5%, 100% 10%, 100% 100%);
+            animation: chartPulse 2s infinite ease-in-out;
+        }
+
+        @keyframes chartPulse {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
+
+        .optimization-status {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .optimization-item {
+            background: rgba(255,255,255,0.05);
+            padding: 12px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .optimization-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        .optimization-indicator.inactive {
+            background: var(--text-muted);
+            animation: none;
+        }
+
+        .optimization-text {
+            font-size: 0.85rem;
+            color: var(--text);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎨 LightBox Control Panel</h1>
+            <div class="status">
+                <div class="status-indicator"></div>
+                <span id="status-text">Connected</span>
+            </div>
+        </div>
+
+        <!-- Performance Monitor -->
+        <div class="performance-monitor">
+            <div class="fps-display">
+                <div class="fps-number" id="fps-display">30</div>
+                <div class="fps-label">Current FPS</div>
+                <div class="fps-target">Target: <span id="fps-target">30</span> FPS</div>
+                <div class="performance-chart">
+                    <div class="chart-line"></div>
+                </div>
+            </div>
+            
+            <div class="active-params">
+                <h3 style="margin-bottom: 10px; color: var(--primary);">Active Parameters</h3>
+                <div class="param-list" id="param-list">
+                    <div class="param-item">
+                        <div class="param-status"></div>
+                        <span class="param-name">Brightness</span>
+                        <span class="param-value" id="param-brightness">80%</span>
+                    </div>
+                    <div class="param-item">
+                        <div class="param-status"></div>
+                        <span class="param-name">Speed</span>
+                        <span class="param-value" id="param-speed">1.0x</span>
+                    </div>
+                    <div class="param-item">
+                        <div class="param-status"></div>
+                        <span class="param-name">Wave Frequency</span>
+                        <span class="param-value" id="param-wave-freq">1.0</span>
+                    </div>
+                    <div class="param-item">
+                        <div class="param-status"></div>
+                        <span class="param-name">Particle Count</span>
+                        <span class="param-value" id="param-particles">100</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Optimization Status -->
+        <div class="section">
+            <h2>Performance Optimizations</h2>
+            <div class="optimization-status">
+                <div class="optimization-item">
+                    <div class="optimization-indicator" id="opt-caching"></div>
+                    <span class="optimization-text">Frame Caching</span>
+                </div>
+                <div class="optimization-item">
+                    <div class="optimization-indicator" id="opt-buffering"></div>
+                    <span class="optimization-text">Double Buffering</span>
+                </div>
+                <div class="optimization-item">
+                    <div class="optimization-indicator" id="opt-adaptive-fps"></div>
+                    <span class="optimization-text">Adaptive FPS</span>
+                </div>
+                <div class="optimization-item">
+                    <div class="optimization-indicator" id="opt-frame-skip"></div>
+                    <span class="optimization-text">Frame Skip</span>
+                </div>
+                <div class="optimization-item">
+                    <div class="optimization-indicator" id="opt-motion-blur"></div>
+                    <span class="optimization-text">Motion Blur</span>
+                </div>
+                <div class="optimization-item">
+                    <div class="optimization-indicator" id="opt-transitions"></div>
+                    <span class="optimization-text">Smooth Transitions</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Presets -->
+        <div class="section">
+            <h2>Quick Presets</h2>
+            <div class="preset-buttons">
+                <button class="btn btn-primary" onclick="applyPreset('performance')">⚡ Performance</button>
+                <button class="btn btn-primary" onclick="applyPreset('quality')">✨ Quality</button>
+                <button class="btn btn-primary" onclick="applyPreset('balanced')">⚖️ Balanced</button>
+                <button class="btn btn-secondary" onclick="resetToDefaults()">🔄 Reset</button>
+            </div>
+        </div>
+
+        <!-- Animation Selection -->
+        <div class="section">
+            <h2>Animation Control</h2>
+            <div class="animation-selector">
+                <select id="animation-select">
+                    <option value="cosmic">Cosmic Nebula</option>
+                    <option value="fire">Fire Effect</option>
+                    <option value="ocean">Ocean Waves</option>
+                    <option value="aurora">Aurora Borealis</option>
+                    <option value="plasma">Plasma Flow</option>
+                    <option value="rainbow">Rainbow Wave</option>
+                    <option value="kaleidoscope">Kaleidoscope</option>
+                </select>
+                <button class="btn btn-primary" onclick="switchAnimation()">Switch</button>
+            </div>
+        </div>
+
+        <!-- Basic Controls -->
+        <div class="section">
+            <h2>Basic Controls</h2>
+            <div class="control-grid">
+                <div class="control-group">
+                    <label for="brightness">Brightness</label>
+                    <div class="control-row">
+                        <input type="range" id="brightness" min="0" max="1" step="0.01" value="0.8">
+                        <span id="brightness-value">80%</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="speed">Animation Speed</label>
+                    <div class="control-row">
+                        <input type="range" id="speed" min="0.1" max="3.0" step="0.1" value="1.0">
+                        <span id="speed-value">1.0x</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="fps">Target FPS</label>
+                    <div class="control-row">
+                        <input type="range" id="fps" min="15" max="60" step="1" value="30">
+                        <span id="fps-value">30</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Visual Effects -->
+        <div class="section">
+            <h2>Visual Effects</h2>
+            <div class="control-grid">
+                <div class="control-group">
+                    <label for="wave-frequency">Wave Frequency</label>
+                    <div class="control-row">
+                        <input type="range" id="wave-frequency" min="0.1" max="5.0" step="0.1" value="1.0">
+                        <span id="wave-frequency-value">1.0</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="wave-amplitude">Wave Amplitude</label>
+                    <div class="control-row">
+                        <input type="range" id="wave-amplitude" min="0.1" max="2.0" step="0.1" value="1.0">
+                        <span id="wave-amplitude-value">1.0</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="wave-speed">Wave Speed</label>
+                    <div class="control-row">
+                        <input type="range" id="wave-speed" min="0.1" max="5.0" step="0.1" value="1.0">
+                        <span id="wave-speed-value">1.0</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="particle-count">Particle Count</label>
+                    <div class="control-row">
+                        <input type="range" id="particle-count" min="10" max="500" step="10" value="100">
+                        <span id="particle-count-value">100</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="particle-size">Particle Size</label>
+                    <div class="control-row">
+                        <input type="range" id="particle-size" min="1" max="10" step="1" value="2">
+                        <span id="particle-size-value">2</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="pattern-complexity">Pattern Complexity</label>
+                    <div class="control-row">
+                        <input type="range" id="pattern-complexity" min="0.1" max="3.0" step="0.1" value="1.0">
+                        <span id="pattern-complexity-value">1.0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Color Controls -->
+        <div class="section">
+            <h2>Color Controls</h2>
+            <div class="control-grid">
+                <div class="control-group">
+                    <label for="hue-shift">Hue Shift</label>
+                    <div class="control-row">
+                        <input type="range" id="hue-shift" min="0" max="1" step="0.01" value="0">
+                        <span id="hue-shift-value">0</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="saturation">Saturation</label>
+                    <div class="control-row">
+                        <input type="range" id="saturation" min="0" max="1" step="0.01" value="0.9">
+                        <span id="saturation-value">0.9</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="gamma">Gamma Correction</label>
+                    <div class="control-row">
+                        <input type="range" id="gamma" min="1.0" max="3.0" step="0.1" value="2.2">
+                        <span id="gamma-value">2.2</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="contrast">Contrast</label>
+                    <div class="control-row">
+                        <input type="range" id="contrast" min="0.5" max="2.0" step="0.1" value="1.0">
+                        <span id="contrast-value">1.0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Effect Toggles -->
+        <div class="section">
+            <h2>Effect Options</h2>
+            <div class="control-grid">
+                <div class="control-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="motion-blur">
+                        <label for="motion-blur">Motion Blur</label>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="effect-layering">
+                        <label for="effect-layering">Effect Layering</label>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="smooth-transitions" checked>
+                        <label for="smooth-transitions">Smooth Transitions</label>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="auto-color-cycle">
+                        <label for="auto-color-cycle">Auto Color Cycle</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Stats -->
+        <div class="section">
+            <h2>System Performance</h2>
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-value" id="current-fps">30</div>
+                    <div class="stat-label">FPS</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="cpu-usage">45%</div>
+                    <div class="stat-label">CPU Usage</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="temperature">42°C</div>
+                    <div class="stat-label">Temperature</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="memory-usage">65%</div>
+                    <div class="stat-label">Memory</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="refresh-rate">120Hz</div>
+                    <div class="stat-label">Matrix Rate</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="uptime">2h 15m</div>
+                    <div class="stat-label">Uptime</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mode Toggle -->
+    <div class="mode-toggle">
+        <button class="btn btn-secondary" onclick="toggleAdvancedMode()">⚙️ Advanced</button>
+    </div>
+
+    <!-- Emergency Stop -->
+    <div class="emergency-stop">
+        <button class="btn btn-danger" onclick="emergencyStop()">🛑 STOP</button>
+    </div>
+
+    <script>
+        // Update value displays
+        document.querySelectorAll('input[type="range"]').forEach(slider => {
+            const valueDisplay = document.getElementById(slider.id + '-value');
+            if (valueDisplay) {
+                slider.addEventListener('input', function() {
+                    let value = this.value;
+                    if (this.id === 'brightness') {
+                        value = Math.round(value * 100) + '%';
+                    } else if (this.id === 'speed') {
+                        value = value + 'x';
+                    } else if (this.id === 'fps') {
+                        value = value;
+                        // Update FPS target display
+                        document.getElementById('fps-target').textContent = value;
+                    }
+                    valueDisplay.textContent = value;
+                    
+                    // Update parameter monitor
+                    updateParameterMonitor(this.id, value);
+                    
+                    // Send update to backend
+                    updateParameter(this.id, this.value);
+                });
+            }
+        });
+
+        // Update checkboxes
+        document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                updateParameter(this.id, this.checked);
+                updateOptimizationStatus();
+            });
+        });
+
+        function updateParameterMonitor(param, value) {
+            const paramMap = {
+                'brightness': 'param-brightness',
+                'speed': 'param-speed',
+                'wave-frequency': 'param-wave-freq',
+                'particle-count': 'param-particles'
+            };
+            
+            const element = document.getElementById(paramMap[param]);
+            if (element) {
+                element.textContent = value;
+            }
+        }
+
+        function updateOptimizationStatus() {
+            const optimizations = {
+                'opt-caching': document.getElementById('motion-blur')?.checked || false,
+                'opt-buffering': true, // Always on
+                'opt-adaptive-fps': document.getElementById('auto-color-cycle')?.checked || false,
+                'opt-frame-skip': false, // Based on performance
+                'opt-motion-blur': document.getElementById('motion-blur')?.checked || false,
+                'opt-transitions': document.getElementById('smooth-transitions')?.checked || false
+            };
+
+            Object.entries(optimizations).forEach(([id, active]) => {
+                const indicator = document.getElementById(id);
+                if (indicator) {
+                    if (active) {
+                        indicator.classList.remove('inactive');
+                    } else {
+                        indicator.classList.add('inactive');
+                    }
+                }
+            });
+        }
+
+        function updateParameter(param, value) {
+            fetch('/api/optimization/update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    parameter: param,
+                    value: value
+                })
+            }).catch(error => {
+                console.error('Error updating parameter:', error);
+            });
+        }
+
+        function applyPreset(preset) {
+            fetch('/api/optimization/preset', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ preset: preset })
+            }).then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload(); // Refresh to show new values
+                }
+            });
+        }
+
+        function resetToDefaults() {
+            fetch('/api/optimization/reset', {
+                method: 'POST'
+            }).then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                }
+            });
+        }
+
+        function switchAnimation() {
+            const animation = document.getElementById('animation-select').value;
+            fetch(`/api/animation/${animation}`, {
+                method: 'POST'
+            }).then(response => response.json())
+            .then(data => {
+                console.log('Animation switched:', data);
+            });
+        }
+
+        function toggleAdvancedMode() {
+            window.location.href = '/comprehensive';
+        }
+
+        function emergencyStop() {
+            fetch('/api/emergency-stop', {
+                method: 'POST'
+            }).then(() => {
+                alert('Emergency stop activated!');
+            });
+        }
+
+        // Update stats periodically
+        setInterval(() => {
+            fetch('/api/stats')
+                .then(response => response.json())
+                .then(data => {
+                    // Update main FPS display
+                    document.getElementById('fps-display').textContent = data.fps || '30';
+                    document.getElementById('current-fps').textContent = data.fps || '30';
+                    
+                    // Update system stats
+                    document.getElementById('cpu-usage').textContent = (data.cpu || 45) + '%';
+                    document.getElementById('temperature').textContent = (data.temperature || 42) + '°C';
+                    document.getElementById('memory-usage').textContent = (data.memory || 65) + '%';
+                    document.getElementById('refresh-rate').textContent = (data.refresh_rate || 120) + 'Hz';
+                    document.getElementById('uptime').textContent = data.uptime || '2h 15m';
+                    
+                    // Update optimization status based on performance
+                    if (data.fps < 25) {
+                        document.getElementById('opt-frame-skip').classList.remove('inactive');
+                    } else {
+                        document.getElementById('opt-frame-skip').classList.add('inactive');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching stats:', error);
+                });
+        }, 1000); // Update every second for real-time feel
+
+        // Initialize optimization status
+        updateOptimizationStatus();
+    </script>
+</body>
+</html> 

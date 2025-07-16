@@ -1,203 +1,108 @@
 #!/bin/bash
-#
-# LightBox HUB75 RGB Matrix Library Installation Script
-# Installs Henner Zeller's rpi-rgb-led-matrix library with Python bindings
-#
 
-set -e  # Exit on error
+# RGB Matrix Library Auto-Installer for LightBox
+# Handles all the dependency hell automatically
 
-echo "================================================"
-echo "LightBox HUB75 RGB Matrix Library Installer"
-echo "================================================"
-echo ""
+set -e  # Exit on any error
 
-# Check if running with sudo
-if [ "$EUID" -ne 0 ]; then 
-    echo "Please run with sudo: sudo bash install_rgb_matrix.sh"
-    exit 1
-fi
+echo "🚀 Starting RGB Matrix Library Installation"
+echo "============================================="
 
-# Detect Raspberry Pi model
-PI_MODEL=$(cat /proc/cpuinfo | grep "Model" | cut -d ':' -f 2 | xargs)
-echo "Detected: $PI_MODEL"
-echo ""
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
 # Update system
-echo "📦 Updating system packages..."
-apt-get update
-apt-get upgrade -y
+echo -e "${YELLOW}📦 Updating system packages...${NC}"
+sudo apt update -y
 
-# Install dependencies
-echo ""
-echo "📦 Installing dependencies..."
-apt-get install -y \
-    git \
-    python3-dev \
-    python3-pillow \
-    python3-numpy \
+# Install all required dependencies
+echo -e "${YELLOW}🔧 Installing build dependencies...${NC}"
+sudo apt install -y \
     build-essential \
-    libgraphicsmagick++-dev \
-    libwebp-dev
+    python3-dev \
+    python3-pip \
+    python3-setuptools \
+    python3-wheel \
+    cython3 \
+    git \
+    cmake \
+    libpython3-dev
 
-# Create temporary directory
-TEMP_DIR="/tmp/rgb-matrix-install"
-mkdir -p $TEMP_DIR
-cd $TEMP_DIR
-
-# Clone the repository
-echo ""
-echo "📥 Cloning rpi-rgb-led-matrix repository..."
-if [ -d "rpi-rgb-led-matrix" ]; then
-    echo "Repository already exists, updating..."
-    cd rpi-rgb-led-matrix
-    git pull
-else
+# Clone RGB matrix library if not exists
+if [ ! -d "rpi-rgb-led-matrix" ]; then
+    echo -e "${YELLOW}📥 Cloning RGB matrix library...${NC}"
     git clone https://github.com/hzeller/rpi-rgb-led-matrix.git
-    cd rpi-rgb-led-matrix
 fi
+
+    cd rpi-rgb-led-matrix
+
+# Clean any previous builds
+echo -e "${YELLOW}🧹 Cleaning previous builds...${NC}"
+make clean || true
 
 # Build the library
-echo ""
-echo "🔨 Building C++ library..."
-make -j$(nproc)
-
-# Build Python bindings
-echo ""
-echo "🐍 Building Python bindings..."
+echo -e "${YELLOW}⚙️  Building RGB matrix library...${NC}"
 make build-python PYTHON=$(which python3)
 
-# Install Python bindings
-echo ""
-echo "📦 Installing Python bindings..."
-make install-python PYTHON=$(which python3)
+# Install Python bindings system-wide
+echo -e "${YELLOW}📦 Installing Python bindings...${NC}"
+cd bindings/python
+sudo python3 setup.py install
 
-# Configure system for optimal performance
-echo ""
-echo "⚙️  Configuring system for optimal performance..."
-
-# Disable audio (conflicts with PWM)
-echo "   - Disabling audio..."
-if ! grep -q "dtparam=audio=off" /boot/config.txt; then
-    echo "dtparam=audio=off" >> /boot/config.txt
+# Try alternative installation method if first fails
+if ! sudo python3 -c "from rgbmatrix import RGBMatrix" 2>/dev/null; then
+    echo -e "${YELLOW}🔄 Trying alternative installation method...${NC}"
+    cd ../..
+    sudo make install-python PYTHON=$(which python3)
 fi
 
-# Set GPU memory split
-echo "   - Setting GPU memory to 16MB..."
-if ! grep -q "gpu_mem=" /boot/config.txt; then
-    echo "gpu_mem=16" >> /boot/config.txt
-else
-    sed -i 's/gpu_mem=.*/gpu_mem=16/' /boot/config.txt
-fi
-
-# Optional: Disable Bluetooth on Pi 3/4
-if [[ "$PI_MODEL" == *"Pi 3"* ]] || [[ "$PI_MODEL" == *"Pi 4"* ]]; then
-    read -p "Disable Bluetooth for better performance? (y/N): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "   - Disabling Bluetooth..."
-        if ! grep -q "dtoverlay=disable-bt" /boot/config.txt; then
-            echo "dtoverlay=disable-bt" >> /boot/config.txt
-        fi
-        systemctl disable bluetooth
-    fi
-fi
-
-# Optional: CPU isolation for best performance
-echo ""
-read -p "Enable CPU isolation for best performance? (y/N): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "   - Configuring CPU isolation..."
-    if ! grep -q "isolcpus=" /boot/cmdline.txt; then
-        sed -i '$ s/$/ isolcpus=3/' /boot/cmdline.txt
-        echo "   ✅ CPU core 3 will be isolated on next reboot"
-    else
-        echo "   ℹ️  CPU isolation already configured"
-    fi
-fi
-
-# Create udev rule for non-root access (optional)
-echo ""
-read -p "Create udev rule for non-root GPIO access? (y/N): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "   - Creating udev rule..."
-    cat > /etc/udev/rules.d/99-gpio.rules << EOF
-SUBSYSTEM=="gpio", KERNEL=="gpiochip*", GROUP="gpio", MODE="0660"
-SUBSYSTEM=="bcm2835-gpiomem", GROUP="gpio", MODE="0660"
-EOF
+# Manual copy as final fallback
+if ! sudo python3 -c "from rgbmatrix import RGBMatrix" 2>/dev/null; then
+    echo -e "${YELLOW}🔄 Using manual installation fallback...${NC}"
     
-    # Add current user to gpio group
-    CURRENT_USER=$(who am i | awk '{print $1}')
-    usermod -a -G gpio $CURRENT_USER
-    echo "   ✅ Added $CURRENT_USER to gpio group"
+    # Find Python version
+    PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+    PYTHON_SITE_PACKAGES="/usr/local/lib/python${PYTHON_VERSION}/dist-packages"
+    
+    # Create directory if it doesn't exist
+    sudo mkdir -p "$PYTHON_SITE_PACKAGES"
+    
+    # Copy the module
+    sudo cp -r bindings/python/rgbmatrix "$PYTHON_SITE_PACKAGES/"
+    
+    # Copy built libraries
+    if [ -d "bindings/python/build" ]; then
+        sudo find bindings/python/build -name "*.so" -exec cp {} "$PYTHON_SITE_PACKAGES/rgbmatrix/" \;
+fi
+
+    # Set permissions
+    sudo chmod -R 755 "$PYTHON_SITE_PACKAGES/rgbmatrix"
 fi
 
 # Test installation
-echo ""
-echo "🧪 Testing installation..."
-cd $TEMP_DIR/rpi-rgb-led-matrix/bindings/python/samples
-python3 -c "import rgbmatrix; print('✅ rgbmatrix module imported successfully')"
+echo -e "${YELLOW}🧪 Testing installation...${NC}"
+if sudo python3 -c "from rgbmatrix import RGBMatrix; print('✅ RGB Matrix library installed successfully!')" 2>/dev/null; then
+    echo -e "${GREEN}✅ SUCCESS: RGB Matrix library is working!${NC}"
+    echo -e "${GREEN}🎯 Your LightBox hardware should now work properly${NC}"
+    
+    # Test hardware connection
+    echo -e "${YELLOW}🔌 Testing hardware connection...${NC}"
+    cd examples-api-use
+    if sudo timeout 5 ./demo -D1 --led-rows=64 --led-cols=64 2>/dev/null; then
+        echo -e "${GREEN}✅ Hardware test passed!${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Hardware test failed - check your wiring${NC}"
+    fi
+    
+else
+    echo -e "${RED}❌ Installation failed. Manual intervention required.${NC}"
+    exit 1
+fi
 
-# Install additional Python packages
 echo ""
-echo "📦 Installing additional Python packages..."
-pip3 install --upgrade pillow numpy
-
-# Create example configuration
-echo ""
-echo "📝 Creating example configuration..."
-EXAMPLE_CONFIG="/tmp/hub75_example_config.json"
-cat > $EXAMPLE_CONFIG << EOF
-{
-  "matrix_type": "HUB75",
-  "matrix_width": 64,
-  "matrix_height": 64,
-  "brightness": 0.75,
-  "fps": 30,
-  "hub75_settings": {
-    "rows": 64,
-    "cols": 64,
-    "chain_length": 1,
-    "parallel": 1,
-    "pwm_bits": 11,
-    "gpio_slowdown": 4,
-    "hardware_mapping": "adafruit-hat",
-    "disable_hardware_pulsing": false
-  }
-}
-EOF
-
-echo "   Example configuration saved to: $EXAMPLE_CONFIG"
-
-# Summary
-echo ""
-echo "================================================"
-echo "✅ Installation completed successfully!"
-echo "================================================"
-echo ""
-echo "Next steps:"
-echo "1. Connect your HUB75 panel and power supply"
-echo "2. Reboot to apply system changes:"
-echo "   sudo reboot"
-echo "3. Test your panel with:"
-echo "   cd $TEMP_DIR/rpi-rgb-led-matrix/bindings/python/samples"
-echo "   sudo python3 runtext.py --led-rows=64 --led-cols=64"
-echo ""
-echo "For LightBox:"
-echo "1. Run the migration script:"
-echo "   python3 scripts/migrate_to_hub75.py"
-echo "2. Start LightBox with HUB75 support:"
-echo "   sudo python3 LightBox/LB_Interface/LightBox/Conductor.py"
-echo ""
-echo "⚠️  Remember:"
-echo "- HUB75 panels require separate 5V power supply"
-echo "- Always run with sudo for GPIO access"
-echo "- See documentation/HUB75_SETUP_GUIDE.md for details"
-echo ""
-
-# Clean up
-cd /
-rm -rf $TEMP_DIR
-
-echo "Installation complete!"
+echo -e "${GREEN}🎉 Installation complete!${NC}"
+echo -e "${GREEN}Run: sudo python3 lightbox_complete.py${NC}"
+echo -e "${GREEN}Web interface: http://$(hostname -I | cut -d' ' -f1):8888${NC}"

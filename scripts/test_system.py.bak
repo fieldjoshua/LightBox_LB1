@@ -1,0 +1,276 @@
+#!/usr/bin/env python3
+"""
+System Test Utility for LightBox HUB75
+
+This script tests the full system configuration and generates a report
+on the current setup, including hardware PWM status, CPU isolation, animations
+available, and performance metrics. It serves as both a diagnostic tool
+and a way to verify that all components are working correctly.
+"""
+
+import os
+import sys
+import json
+import time
+import logging
+from pathlib import Path
+
+# Add parent directory to path for local imports
+parent_dir = Path(__file__).resolve().parent.parent
+sys.path.append(str(parent_dir))
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+logger = logging.getLogger("system_test")
+
+try:
+    # Import our hardware detection utility
+    from scripts.util.hardware_detect import (
+        detect_hardware_pwm,
+        check_cpu_isolation,
+        get_system_info
+    )
+    HARDWARE_DETECT_AVAILABLE = True
+except ImportError:
+    logger.warning("Hardware detection utilities not available")
+    HARDWARE_DETECT_AVAILABLE = False
+
+try:
+    # Import core components for testing
+    from core.config import ConfigManager
+    from core.conductor import Conductor
+    CONFIG_AVAILABLE = True
+except ImportError:
+    logger.warning("Core components not available")
+    CONFIG_AVAILABLE = False
+
+
+def print_header(title):
+    """Print a section header."""
+    print("\n" + "=" * 60)
+    print(f" {title}")
+    print("=" * 60)
+
+
+def test_hardware_detection():
+    """Test hardware detection capabilities."""
+    print_header("HARDWARE DETECTION")
+    
+    if not HARDWARE_DETECT_AVAILABLE:
+        print("❌ Hardware detection utilities not available")
+        return False
+    
+    print("Testing hardware PWM detection...")
+    try:
+        pwm_detected = detect_hardware_pwm()
+        if pwm_detected:
+            print("✅ Hardware PWM detected - GPIO4-GPIO18 jumper is connected")
+        else:
+            print("⚠️  Hardware PWM not detected - animations may flicker")
+    except Exception as e:
+        print(f"❌ Error during PWM detection: {e}")
+    
+    print("\nTesting CPU isolation...")
+    try:
+        cpu_isolated = check_cpu_isolation()
+        if cpu_isolated:
+            print("✅ CPU isolation detected - Core 3 is dedicated to the LED matrix")
+        else:
+            print("⚠️  CPU isolation not enabled - consider adding 'isolcpus=3' to /boot/cmdline.txt")
+    except Exception as e:
+        print(f"❌ Error during CPU isolation check: {e}")
+    
+    print("\nGathering system information...")
+    try:
+        sys_info = get_system_info()
+        print(f"  Raspberry Pi Model: {sys_info.get('model', 'Unknown')}")
+        if 'cpu_temperature' in sys_info:
+            temp = sys_info['cpu_temperature']
+            status = "✅ Good" if temp < 70 else "⚠️  High"
+            print(f"  CPU Temperature: {temp:.1f}°C ({status})")
+        
+        if 'memory_total' in sys_info and 'memory_available' in sys_info:
+            total = sys_info['memory_total']
+            available = sys_info['memory_available']
+            used_percent = (total - available) / total * 100
+            status = "✅ Good" if used_percent < 80 else "⚠️  High"
+            print(f"  Memory Usage: {used_percent:.1f}% of {total:.0f} MB ({status})")
+            
+        if 'kernel_version' in sys_info:
+            print(f"  Kernel Version: {sys_info['kernel_version']}")
+    except Exception as e:
+        print(f"❌ Error gathering system information: {e}")
+    
+    return True
+
+
+def test_config_system():
+    """Test the configuration system."""
+    print_header("CONFIGURATION SYSTEM")
+    
+    if not CONFIG_AVAILABLE:
+        print("❌ Configuration system not available")
+        return False
+    
+    try:
+        config = ConfigManager("config/settings.json")
+        print(f"✅ Configuration loaded from {config.config_path}")
+        
+        # Check for critical settings
+        matrix_type = config.get("matrix_type")
+        print(f"  Matrix Type: {matrix_type}")
+        
+        if matrix_type == "hub75":  , # Check HUB75 configuration
+            hub_config = config.get("hub75", {})
+            print("\nHUB75 Configuration:")
+            print(f"  Dimensions: {hub_config.get('rows', 64)}x{hub_config.get('cols', 64)}")
+            print(f"  Chain Length: {hub_config.get('chain_length', 1)}")
+            print(f"  PWM Bits: {hub_config.get('pwm_bits', 11)}")
+            print(f"  GPIO Slowdown: {hub_config.get('gpio_slowdown', 4)}")
+            print(f"  Refresh Rate Limit: {hub_config.get('limit_refresh', 0)} Hz")
+            
+        # Check performance settings
+        perf_config = config.get("performance", {})
+        print("\nPerformance Configuration:")
+        print(f"  CPU Isolation: {perf_config.get('cpu_isolation', False)}")
+        print(f"  Double Buffering: {perf_config.get('use_double_buffering', True)}")
+        print(f"  Fixed Frame Time: {perf_config.get('fixed_frame_time', False)}")
+        
+        # Check available animations
+        scripts_dir = parent_dir / "scripts"
+        hub75_scripts = list(scripts_dir.glob("*hub75.py"))
+        print(f"\nFound {len(hub75_scripts)} HUB75 animation scripts:")
+        for script in hub75_scripts[:5]:  # Show only first 5
+            print(f"  - {script.name}")
+        if len(hub75_scripts) > 5:
+            print(f"  ... and {len(hub75_scripts) - 5} more")
+        
+    except Exception as e:
+        print(f"❌ Error testing configuration system: {e}")
+        return False
+        
+    return True
+
+
+def test_animation_system():
+    """Test the animation system by initializing the conductor."""
+    print_header("ANIMATION SYSTEM")
+    
+    if not CONFIG_AVAILABLE:
+        print("❌ Animation system not available due to missing core components")
+        return False
+    
+    try:
+        # Initialize conductor without starting animations
+        config = ConfigManager("config/settings.json")
+        conductor = Conductor(config)
+        
+        if not hasattr(conductor, 'animations') or not conductor.animations:
+            print("❌ No animations available in conductor")
+            return False
+        
+        print(f"✅ Animation system initialized with {len(conductor.animations)} animations")
+        print("\nAvailable Animations:")
+        
+        # Sort animations by name
+        sorted_animations = sorted(conductor.animations.keys())
+        
+        # Print animations with separator every 5
+        for i, anim in enumerate(sorted_animations):
+            if i > 0 and i % 5 == 0:
+                print("")  # Add line break
+            print(f"  - {anim}", end="  ")
+        print("\n")  # Final newline
+        
+        # Test current animation
+        current = config.get("animation_program")
+        if current and current in conductor.animations:
+            print(f"✅ Current animation: {current}")
+        else:
+            print(f"⚠️  Current animation not set or invalid: {current}")
+            
+    except Exception as e:
+        print(f"❌ Error testing animation system: {e}")
+        return False
+        
+    return True
+
+
+def generate_config_report():
+    """Generate a detailed configuration report in JSON format."""
+    print_header("CONFIGURATION REPORT")
+    
+    if not CONFIG_AVAILABLE:
+        print("❌ Cannot generate report - configuration system not available")
+        return False
+    
+    try:
+        config = ConfigManager("config/settings.json")
+        
+        # Collect system information
+        report = {
+            "timestamp": time.time(),
+            "date": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "config": config.get_all()
+        }
+        
+        # Add hardware information
+        if HARDWARE_DETECT_AVAILABLE:
+            report["hardware"] = get_system_info()
+            report["hardware"]["hardware_pwm_detected"] = detect_hardware_pwm()
+            report["hardware"]["cpu_isolation_enabled"] = check_cpu_isolation()
+        
+        # Add animation information
+        scripts_dir = parent_dir / "scripts"
+        animation_files = list(scripts_dir.glob("*hub75.py"))
+        report["animations"] = {
+            "count": len(animation_files),
+            "files": [f.name for f in animation_files]
+        }
+        
+        # Generate the report file
+        report_file = parent_dir / "system_report.json"
+        with open(report_file, 'w') as f:
+            json.dump(report, f, indent=2)
+            
+        print(f"✅ Configuration report generated: {report_file}")
+        
+        # Also print a summary
+        print("\nSystem Summary:")
+        print(f"  Matrix Type: {config.get('matrix_type')}")
+        if config.get('matrix_type') == 'hub75':
+            hub = config.get('hub75', {})
+            print(f"  HUB75 Configuration: {hub.get('rows')}x{hub.get('cols')}, {hub.get('pwm_bits')} bit color")
+        print(f"  Animations Available: {len(animation_files)}")
+        if HARDWARE_DETECT_AVAILABLE:
+            model = get_system_info().get('model', 'Unknown')
+            print(f"  System: {model}")
+            
+    except Exception as e:
+        print(f"❌ Error generating configuration report: {e}")
+        return False
+        
+    return True
+
+
+def main():
+    """Main entry point."""
+    print_header("LIGHTBOX SYSTEM TEST")
+    print("Running comprehensive system tests...\n")
+    
+    test_hardware_detection()
+    test_config_system()
+    test_animation_system()
+    generate_config_report()
+    
+    print_header("TEST COMPLETE")
+    print("Review the results above for any warnings or errors.")
+    print("For detailed configuration, see the generated system_report.json")
+
+
+if __name__ == "__main__":
+    main() 

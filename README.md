@@ -97,8 +97,23 @@ sudo bash install_rgb_matrix.sh
 ```
 
 ### 3. Install Python Dependencies
+
+#### For Raspberry Pi
 ```bash
-pip3 install -r requirements.txt
+# Use the provided setup script
+./setup_venv_pi.sh
+
+# Activate the virtual environment
+source venv/bin/activate
+```
+
+#### For Development Environment (non-Raspberry Pi)
+```bash
+# Use the development setup script
+./setup_venv_dev.sh
+
+# Activate the virtual environment
+source venv/bin/activate
 ```
 
 ### 4. Configure Hardware

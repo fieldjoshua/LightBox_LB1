@@ -1,107 +1,66 @@
 #!/bin/bash
-# Sync LightBox Organized project to Raspberry Pi
-# This script syncs the project files to the Pi for deployment
+# sync_to_pi.sh - Script to sync LightBox2.0 to Raspberry Pi
 
-set -e
-
-PI_HOST="lightbox.local"
+# Configuration - MODIFY THESE VALUES
 PI_USER="joshuafield"
-PI_PROJECT_DIR="~/LightBox_Organized"
-MOUNT_POINT="/tmp/pi_mount"
+PI_HOST="lightbox.local"  # Change to your Pi's hostname or IP
+PI_DIR="/home/joshuafield/LightBox2.0"
 
-echo "🚀 Syncing LightBox Organized to Pi..."
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
-# Check if Pi filesystem is mounted
-if ! mountpoint -q "$MOUNT_POINT"; then
-    echo "❌ Pi filesystem not mounted. Run ./mount_pi.sh first."
+echo -e "${GREEN}=== LightBox2.0 Sync to Raspberry Pi ===${NC}"
+echo "Syncing to: ${PI_USER}@${PI_HOST}:${PI_DIR}"
+
+# Check if rsync is installed
+if ! command -v rsync &> /dev/null; then
+    echo -e "${RED}Error: rsync is not installed. Please install it first.${NC}"
     exit 1
 fi
 
-# Test SSH connection
-echo "🔍 Testing SSH connection..."
-if ! ssh -o ConnectTimeout=5 -o BatchMode=yes "$PI_USER@$PI_HOST" exit 2>/dev/null; then
-    echo "❌ Cannot connect to $PI_USER@$PI_HOST"
+# Check if Pi is reachable
+echo -e "${YELLOW}Checking if Pi is reachable...${NC}"
+ping -c 1 ${PI_HOST} &> /dev/null
+if [ $? -ne 0 ]; then
+    echo -e "${RED}Error: Cannot reach ${PI_HOST}. Check connection and hostname/IP.${NC}"
     exit 1
 fi
 
-# Create project directory on Pi
-echo "📁 Creating project directory on Pi..."
-ssh "$PI_USER@$PI_HOST" "mkdir -p $PI_PROJECT_DIR"
-
-# Sync project files (excluding unnecessary files)
-echo "📤 Syncing project files..."
-rsync -av --progress \
-    --exclude='.git/' \
-    --exclude='venv/' \
-    --exclude='__pycache__/' \
-    --exclude='*.pyc' \
-    --exclude='.DS_Store' \
-    --exclude='*.log' \
-    --exclude='.vscode/' \
-    --exclude='.idea/' \
-    --exclude='*.tmp' \
-    --exclude='*.temp' \
-    --exclude='.cache/' \
-    --exclude='htmlcov/' \
-    --exclude='.coverage' \
-    --exclude='.pytest_cache/' \
-    --exclude='.mypy_cache/' \
-    --exclude='.pyre/' \
-    --exclude='*.egg-info/' \
-    --exclude='build/' \
-    --exclude='dist/' \
-    --exclude='downloads/' \
-    --exclude='eggs/' \
-    --exclude='parts/' \
-    --exclude='sdist/' \
-    --exclude='var/' \
-    --exclude='wheels/' \
-    --exclude='.installed.cfg' \
-    --exclude='MANIFEST' \
-    --exclude='*.egg' \
-    --exclude='.Python' \
-    --exclude='lib/' \
-    --exclude='lib64/' \
-    --exclude='develop-eggs/' \
-    --exclude='.eggs/' \
-    --exclude='env.bak/' \
-    --exclude='venv.bak/' \
-    --exclude='.env' \
-    --exclude='config/local_settings.json' \
-    --exclude='*.bin' \
-    --exclude='*.hex' \
-    --exclude='*.service' \
-    --exclude='install_rgb_matrix.sh' \
-    ./ "$PI_USER@$PI_HOST:$PI_PROJECT_DIR/"
-
-if [ $? -eq 0 ]; then
-    echo "✅ Project files synced successfully!"
-else
-    echo "❌ Failed to sync project files"
+# Create directory on Pi if it doesn't exist
+echo -e "${YELLOW}Creating directory on Pi if needed...${NC}"
+ssh ${PI_USER}@${PI_HOST} "mkdir -p ${PI_DIR}" || {
+    echo -e "${RED}Error: Failed to create directory on Pi. Check SSH connection.${NC}"
     exit 1
-fi
+}
 
-# Set proper permissions
-echo "🔐 Setting file permissions..."
-ssh "$PI_USER@$PI_HOST" "chmod +x $PI_PROJECT_DIR/*.sh"
-ssh "$PI_USER@$PI_HOST" "chmod +x $PI_PROJECT_DIR/main.py"
-ssh "$PI_USER@$PI_HOST" "chmod +x $PI_PROJECT_DIR/lightbox.py"
+# Sync files to Pi using rsync
+echo -e "${YELLOW}Syncing files to Pi...${NC}"
+rsync -avz --exclude 'venv/' \
+           --exclude '__pycache__/' \
+           --exclude '*.pyc' \
+           --exclude '.git/' \
+           --exclude 'pi_filesystem/' \
+           --exclude '*.bak' \
+           --exclude '.DS_Store' \
+           --progress ./ ${PI_USER}@${PI_HOST}:${PI_DIR}/ || {
+    echo -e "${RED}Error: Failed to sync files to Pi. Check connection and permissions.${NC}"
+    exit 1
+}
 
-# Create virtual environment on Pi if it doesn't exist
-echo "🐍 Setting up Python environment..."
-ssh "$PI_USER@$PI_HOST" "cd $PI_PROJECT_DIR && python3 -m venv venv"
+# Setup on Pi
+echo -e "${YELLOW}Setting up virtual environment on Pi...${NC}"
+ssh ${PI_USER}@${PI_HOST} "cd ${PI_DIR} && chmod +x setup_venv_pi.sh && ./setup_venv_pi.sh" || {
+    echo -e "${RED}Error: Failed to set up virtual environment on Pi.${NC}"
+    exit 1
+}
 
-# Install dependencies
-echo "📦 Installing Python dependencies..."
-ssh "$PI_USER@$PI_HOST" "cd $PI_PROJECT_DIR && source venv/bin/activate && pip install -r requirements-optimized.txt"
-
-# Install rgbmatrix library
-echo "🛠️ Installing rgbmatrix library..."
-ssh "$PI_USER@$PI_HOST" "cd $PI_PROJECT_DIR && sudo bash scripts/install_rgb_matrix.sh"
-
-
-echo ""
-echo "🎉 Sync complete! Next steps:"
-echo "   1. SSH to Pi: ssh pi@lightbox.local"
-echo "   2. Run setup: cd ~/LightBox_Organized && ./setup_lightbox_pi.sh"
-echo "   3. Or run directly: cd ~/LightBox_Organized && source venv/bin/activate && python3 main.py" 
+echo -e "${GREEN}=== Sync Complete ===${NC}"
+echo -e "To run LightBox on your Pi:"
+echo -e "  1. SSH to Pi: ${YELLOW}ssh ${PI_USER}@${PI_HOST}${NC}"
+echo -e "  2. Navigate to directory: ${YELLOW}cd ${PI_DIR}${NC}"
+echo -e "  3. Activate venv: ${YELLOW}source venv/bin/activate${NC}"
+echo -e "  4. Run LightBox: ${YELLOW}sudo python main.py${NC}"
+echo -e "  5. Access web interface at: ${YELLOW}http://${PI_HOST}:8888${NC}" 

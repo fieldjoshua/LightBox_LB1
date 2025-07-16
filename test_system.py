@@ -37,7 +37,7 @@ def test_imports():
         print("✅ Utility modules imported successfully")
         
         # Test web modules
-        from web.app import create_app
+        from api.WebAPI import create_app
         print("✅ Web modules imported successfully")
         
         return True

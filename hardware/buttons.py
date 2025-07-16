@@ -7,6 +7,7 @@ import RPi.GPIO as GPIO
 import time
 import threading
 
+
 class ButtonController:
     """Handle physical button inputs with debouncing"""
     
@@ -64,6 +65,10 @@ class ButtonController:
         self.running = False
         GPIO.cleanup()
         
+    def cleanup(self):
+        """Clean up GPIO resources - alias for stop()"""
+        self.stop()
+        
     def monitor_buttons(self):
         """Main button monitoring loop with debouncing"""
         while self.running:
@@ -73,7 +78,7 @@ class ButtonController:
                 
                 # Check for state change with debouncing
                 if (current_state != button['last_state'] and 
-                    current_time - button['last_time'] > 0.1):  # 100ms debounce
+                        current_time - button['last_time'] > 0.1):  # 100ms debounce
                     
                     if current_state == GPIO.LOW:  # Button pressed
                         if name in self.callbacks:
@@ -100,14 +105,16 @@ class ButtonController:
     def on_brightness_up(self):
         """Increase brightness"""
         if self.led_controller:
-            new_brightness = min(1.0, self.led_controller.config.BRIGHTNESS + 0.1)
+            new_brightness = min(1.0, 
+                               self.led_controller.config.BRIGHTNESS + 0.1)
             self.led_controller.update_config({'BRIGHTNESS': new_brightness})
             print(f"Brightness: {int(new_brightness * 100)}%")
             
     def on_brightness_down(self):
         """Decrease brightness"""
         if self.led_controller:
-            new_brightness = max(0.0, self.led_controller.config.BRIGHTNESS - 0.1)
+            new_brightness = max(0.0, 
+                               self.led_controller.config.BRIGHTNESS - 0.1)
             self.led_controller.update_config({'BRIGHTNESS': new_brightness})
             print(f"Brightness: {int(new_brightness * 100)}%")
             

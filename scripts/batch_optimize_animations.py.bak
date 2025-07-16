@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+"""
+Batch Animation Optimizer for HUB75 LED Matrix
+
+This script optimizes all animation scripts in the scripts directory 
+for better performance on HUB75 LED matrices.
+
+Features added to each animation:
+- Standard parameter handling
+- Proper structure and documentation
+- Performance optimizations for HUB75 matrices
+- Consistent naming and metadata
+"""
+
+import os
+import sys
+import argparse
+from pathlib import Path
+
+# Add parent directory to Python path
+current_dir = Path(__file__).parent
+parent_dir = current_dir.parent
+sys.path.append(str(parent_dir))
+
+# Import the animation optimizer
+try:
+    from scripts.util.optimize_animation import optimize_animation, batch_optimize
+except ImportError:
+    print("Error: Could not import optimize_animation module")
+    print("Make sure scripts/util/optimize_animation.py exists")
+    sys.exit(1)
+
+# Default animation pattern
+ANIMATION_PATTERN = "*_hub75.py"
+
+# Non-hub75 animations to convert to hub75
+CONVERT_CANDIDATES = [
+    "aurora.py",
+    "waves.py",
+    "shimmer.py",
+    "parametric_waves.py",
+    "symmetry.py"
+]
+
+
+def main():
+    """Main function."""
+    parser = argparse.ArgumentParser(
+        description="Batch optimize all HUB75 animations"
+    )
+    
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Process all Python files, not just *_hub75.py"
+    )
+    
+    parser.add_argument(
+        "--convert",
+        action="store_true",
+        help="Convert non-HUB75 animations to HUB75 versions"
+    )
+    
+    parser.add_argument(
+        "--scripts-dir",
+        type=str,
+        default=str(current_dir),
+        help=f"Scripts directory (default: {current_dir})"
+    )
+    
+    parser.add_argument(
+        "--no-backup",
+        action="store_true",
+        help="Don't create backup files"
+    )
+    
+    args = parser.parse_args()
+    
+    # Determine the scripts directory
+    scripts_dir = Path(args.scripts_dir)
+    if not scripts_dir.exists() or not scripts_dir.is_dir():
+        print(f"Error: Scripts directory not found: {scripts_dir}")
+        return 1
+    
+    # Process existing HUB75 animations
+    print("=" * 60)
+    print("Optimizing existing HUB75 animations")
+    print("=" * 60)
+    pattern = "*.py" if args.all else ANIMATION_PATTERN
+    batch_optimize(scripts_dir, pattern)
+    
+    # Convert non-HUB75 animations if requested
+    if args.convert:
+        print("\n" + "=" * 60)
+        print("Converting non-HUB75 animations to HUB75")
+        print("=" * 60)
+        
+        for filename in CONVERT_CANDIDATES:
+            source_path = scripts_dir / filename
+            if not source_path.exists():
+                print(f"Skipping {filename} - file not found")
+                continue
+                
+            # Generate hub75 version filename
+            target_name = filename.replace(".py", "_hub75.py")
+            target_path = scripts_dir / target_name
+            
+            if target_path.exists():
+                print(f"Skipping {filename} - target {target_name} already exists")
+                continue
+            
+            print(f"\nConverting {filename} to {target_name}")
+            
+            # Optimize and save as new file
+            optimize_animation(source_path, target_path, backup=not args.no_backup)
+    
+    print("\nOptimization complete!")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main()) 

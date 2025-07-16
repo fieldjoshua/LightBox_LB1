@@ -1,0 +1,38 @@
+{
+  "hub75": {
+    "rows": 64,
+    "cols": 64,
+    "chain_length": 1,
+    "parallel": 1,
+    "hardware_mapping": "adafruit-hat",
+    
+    "_comment_anti_jitter": "Parameters to reduce jitteriness:",
+    
+    "pwm_bits": 9,
+    "_comment_pwm_bits": "Lower = faster refresh, less jitter (try 7-9 vs 11)",
+    
+    "pwm_lsb_nanoseconds": 100,
+    "_comment_pwm_lsb": "Lower = faster timing (try 100-200 vs 130)",
+    
+    "pwm_dither_bits": 2,
+    "_comment_dither": "Higher = smoother colors (try 1-2)",
+    
+    "gpio_slowdown": 3,
+    "_comment_gpio": "Lower = faster GPIO (try 2-3 vs 4 for Pi 3B+)",
+    
+    "limit_refresh": 60,
+    "_comment_refresh": "Lower = more stable (try 60Hz vs 120Hz)",
+    
+    "hardware_pwm": "on",
+    "_comment_hardware_pwm": "Force enable your jumper mod",
+    
+    "scan_mode": 1,
+    "_comment_scan": "Try interlaced scanning (0=progressive, 1=interlaced)",
+    
+    "row_address_type": 2,
+    "_comment_row_addr": "Panel-specific addressing (try 0-3)",
+    
+    "multiplexing": 8,
+    "_comment_mux": "Panel-specific multiplexing (try 0, 8, 10)"
+  }
+} 

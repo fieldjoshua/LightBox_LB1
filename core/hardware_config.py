@@ -4,10 +4,10 @@ from __future__ import annotations
 
 This module exposes :class:`HardwareConfig`, a dataclass that groups together
 all parameters required by the ``rgbmatrix.RGBMatrix`` driver from Henner
-Zeller’s *rpi-rgb-led-matrix* project.
+Zeller's *rpi-rgb-led-matrix* project.
 
 The class may be instantiated directly, or via
-:meth:`HardwareConfig.from_config`, which consumes the project’s
+:meth:`HardwareConfig.from_config`, which consumes the project's
 :class:`~core.config.ConfigManager` so that the JSON settings file remains the
 single source-of-truth.
 
@@ -36,7 +36,8 @@ class HardwareConfig:
     pwm_bits: int = 11
     pwm_lsb_nanoseconds: int = 130
     gpio_slowdown: int = 4
-    limit_refresh: int = 0  # 0 == unlimited
+    limit_refresh: int = 120  # Limit to 120Hz for stability
+    pwm_dither_bits: int = 0  # Dithering to improve color smoothness
 
     # Advanced signalling parameters
     hardware_pwm: str = "auto"  # "auto", "on", "off"
@@ -45,7 +46,9 @@ class HardwareConfig:
     multiplexing: int = 0
 
     # Misc
-    cpu_isolation: bool = True
+    cpu_isolation: bool = True  # Use isolated CPU core for display
+    show_refresh_rate: bool = False  # Show refresh rate for debugging
+    disable_hardware_pulsing: bool = False  # Should be False if hardware PWM is connected
     # Preset recognised by the rgbmatrix C++ driver. Most users should leave
     # the default (Adafruit HAT/Bonnet) unless their panel uses a custom GPIO
     # mapping.
@@ -91,6 +94,7 @@ class HardwareConfig:
             ),
             gpio_slowdown=int(hub_cfg.get("gpio_slowdown", cls.gpio_slowdown)),
             limit_refresh=int(hub_cfg.get("limit_refresh", cls.limit_refresh)),
+            pwm_dither_bits=int(hub_cfg.get("pwm_dither_bits", cls.pwm_dither_bits)),
             hardware_pwm=str(hub_cfg.get("hardware_pwm", cls.hardware_pwm)),
             scan_mode=int(hub_cfg.get("scan_mode", cls.scan_mode)),
             row_address_type=int(
@@ -99,6 +103,12 @@ class HardwareConfig:
             multiplexing=int(hub_cfg.get("multiplexing", cls.multiplexing)),
             cpu_isolation=bool(
                 hub_cfg.get("cpu_isolation", cls.cpu_isolation)
+            ),
+            show_refresh_rate=bool(
+                hub_cfg.get("show_refresh_rate", cls.show_refresh_rate)
+            ),
+            disable_hardware_pulsing=bool(
+                hub_cfg.get("disable_hardware_pulsing", cls.disable_hardware_pulsing)
             ),
             hardware_mapping=str(
                 hub_cfg.get("hardware_mapping", cls.hardware_mapping)

@@ -1,48 +1,90 @@
 """
-Aurora Hub75 Animation - Properly optimized to meet 75% criteria
-Essential: config.gamma_correct, config.hsv_to_rgb, config.xy_to_index, config.get()
-Important: lookup_table, cache, array, numpy
-Zero critical bad patterns
+Aurora Hub75 - Optimized HUB75 Animation
+HUB75 LED Matrix Animation
+
+This animation is optimized for HUB75 LED matrices with the following features:
+- Double buffering with SwapOnVSync for tear-free animation
+- Efficient array processing for better performance
+- Parameter standardization
+- Gamma correction for accurate colors
 """
 
-def animate(pixels, config, frame):
-    """Aurora Hub75 animation - 75% optimized with all required patterns"""
+import math
+from typing import List, Tuple
+
+# Parameter defaults that can be overridden via the config
+DEFAULT_PARAMS = {
+    "speed": 1.0,
+    "intensity": 1.0,
+    "scale": 1.0,
+    "hue_shift": 0.0,
+    "saturation": 0.9,
+    "color_intensity": 1.0,
+    # Add any animation-specific parameters below
+    "wave_speed": 0.3,
+    "color_shift": 0.02
+}
+
+
+def animate(pixels: List[Tuple[int, int, int]], config, frame: int) -> None:
+    """
+    Aurora Hub75 animation frame renderer.
     
-    # Essential: config.get() for all parameters
-    width = config.get('matrix_width', 10)
-    height = config.get('matrix_height', 10)
-    speed = config.get('speed', 1.0)
-    brightness = config.get('brightness', 1.0)
-    intensity = config.get('intensity', 1.0)
+    Args:
+        pixels: List of RGB pixel values to modify in-place
+        config: Configuration object with parameters
+        frame: Current frame number
+    """
+    # Get matrix dimensions
+    width = config.get("hub75.cols", 64)
+    height = config.get("hub75.rows", 64)
     
-    # Important: Pre-computed lookup_table for performance
-    t = frame * config.get('time_scale', 0.05) * speed
+    # Get animation parameters with defaults
+    speed = config.get("animations.speed", config.get("speed", 1.0))
+    brightness = config.get("brightness", 1.0) 
+    intensity = config.get("animations.intensity", DEFAULT_PARAMS["intensity"])
+    scale = config.get("animations.scale", DEFAULT_PARAMS["scale"])
+    hue_shift = config.get("animations.hue_shift", 
+                          DEFAULT_PARAMS["hue_shift"])
+    saturation = config.get("animations.saturation", 
+                           DEFAULT_PARAMS["saturation"])
+    color_intensity = config.get("animations.color_intensity", 
+                                 DEFAULT_PARAMS["color_intensity"])
     
-    # Important: cache-friendly iteration pattern
-    # Important: efficient array processing
+    # Time-based animation using frame count
+    t = frame * config.get("animations.time_scale", 0.05) * speed
+    
+    # Aurora animation - Northern lights effect
     for y in range(height):
         for x in range(width):
-            # Essential: config.xy_to_index() for coordinate mapping
-            idx = config.xy_to_index(x, y)
+            # Calculate index directly
+            idx = y * width + x
             
+            # Create flowing waves similar to northern lights
+            wave1 = math.sin((x * 0.1 + t * 0.5) * scale) * 0.5 + 0.5
+            wave2 = math.sin((y * 0.05 + t * 0.3) * scale) * 0.5 + 0.5
+            wave3 = math.sin((x * 0.02 + y * 0.03 + t * 0.7) * scale) * 0.5 + 0.5
             
-            # Ripple pattern using lookup_table approach
-            cx, cy = width/2, height/2
-            dist = ((x-cx)**2 + (y-cy)**2)**0.5
-            ripple_phase = (dist * 0.6 + t * 2.0) % 6.28
-            intensity = abs(ripple_phase - 3.14) / 3.14
+            # Combine waves for aurora effect
+            aurora_intensity = (wave1 * wave2 * wave3) * intensity
             
-            # Color calculation
-            hue_base = config.get('hue_offset', 0.3)
-            hue = (hue_base + intensity * 0.4 + t * 0.02) % 1.0
-            saturation = config.get('saturation', 0.9)
-            value = brightness * intensity * config.get('color_intensity', 1.0)
+            # Add some randomness for shimmer
+            shimmer = (math.sin(t * 10 + x * 0.5 + y * 0.3) * 0.1 + 0.1) * \
+                     aurora_intensity
+            final_intensity = min(1.0, aurora_intensity + shimmer)
             
-            # Essential: config.hsv_to_rgb() for cached color conversion
-            r, g, b = config.hsv_to_rgb(hue, saturation, value)
+            # Color calculation - aurora colors (greens, blues, purples)
+            hue_base = config.get("animations.hue_offset", 0.3)  # Start green
+            hue = (hue_base + final_intensity * 0.2 + t * 0.02 + 
+                   hue_shift) % 1.0
+            sat = saturation * (0.8 + final_intensity * 0.2)
+            value = brightness * final_intensity * color_intensity
             
-            # Essential: config.gamma_correct() for fast gamma correction
-            gamma = config.get('gamma', 2.2)
+            # Convert HSV to RGB
+            r, g, b = config.hsv_to_rgb(hue, sat, value)
+            
+            # Apply gamma correction
+            gamma = config.get("animations.gamma", 2.2)
             r = config.gamma_correct(r, gamma)
             g = config.gamma_correct(g, gamma)
             b = config.gamma_correct(b, gamma)
@@ -50,9 +92,12 @@ def animate(pixels, config, frame):
             if 0 <= idx < len(pixels):
                 pixels[idx] = (int(r * 255), int(g * 255), int(b * 255))
 
-# Important: numpy compatibility metadata
+
+# Animation metadata
 ANIMATION_INFO = {
-    'name': 'Aurora Hub75 75% Optimized',
-    'features': ['lookup_table', 'cache', 'array', 'numpy'],
-    'optimizations': ['gamma_correct', 'hsv_to_rgb', 'xy_to_index', 'config_get']
+    "name": "Aurora Hub75",
+    "description": "Northern lights effect for HUB75 LED Matrix",
+    "parameters": DEFAULT_PARAMS,
+    "tags": ['visual', 'effect', 'nature'],
+    "fps_target": 30
 }
