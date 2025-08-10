@@ -15,7 +15,6 @@ import sys
 import re
 import shutil
 import argparse
-import subprocess
 from pathlib import Path
 
 # Constants

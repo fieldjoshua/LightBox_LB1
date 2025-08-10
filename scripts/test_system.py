@@ -8,7 +8,6 @@ available, and performance metrics. It serves as both a diagnostic tool
 and a way to verify that all components are working correctly.
 """
 
-import os
 import sys
 import json
 import time

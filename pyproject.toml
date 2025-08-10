@@ -1,0 +1,55 @@
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+respect-gitignore = true
+extend-exclude = [
+  "LBQualm.py",
+  "venv",
+  "web/static",
+  "LightBox_Complete_Archive*",
+  "LightBox_Text_Archive*",
+  "LightBox_All_29_Versions*",
+  "LightBox_Pi_Deploy",
+  "LightBox_2.5",
+  "scripts",
+  "lightbox_optimizations",
+  "optimized_animation_engine.py",
+  "lightbox_complete_fixed.py",
+  "lightbox_minimal_fixed.py",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "RUF"]
+ignore = [
+  "D", "ANN", "E501",
+  "RUF001", "RUF002", "RUF003",  # ambiguous unicode
+  "W293"                         # blank-line-with-whitespace
+]
+
+[tool.ruff.lint.per-file-ignores]
+"web/app_simple.py" = ["E402"]
+
+"hardware/hardware_manager.py" = ["E402"]
+
+"api/WebAPI.py" = ["E402"]
+
+"core/conductor.py" = ["E402"]
+
+"lightbox_complete.py" = ["E402"]
+"enhanced_lightbox.py" = ["E402"]
+"simple_lightbox.py" = ["E402", "E701"]
+"lightbox_hub75_optimized.py" = ["E722", "F841"]
+"optimize_lightbox_performance.py" = ["E722", "F841"]
+"test_*.py" = ["F401", "F821", "E402", "E722"]
+"main.py" = ["E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["core", "drivers", "hardware", "api", "utils", "web"]
+combine-as-imports = true
+force-sort-within-sections = true
+
+[tool.ruff.format]
+quote-style = "preserve"
+indent-style = "space"
+line-ending = "lf"
+docstring-code-format = false

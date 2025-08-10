@@ -1,7 +1,17 @@
-adafruit-blinka>=8.20.0
-adafruit-circuitpython-neopixel>=6.3.0
-RPi.GPIO>=0.7.1
-Flask>=3.0.0
-Flask-SocketIO>=5.3.0
-Pillow>=10.0.0
-adafruit-circuitpython-ssd1306>=2.12.0
+adafruit-blinka==8.20.0
+adafruit-circuitpython-neopixel==6.3.0
+RPi.GPIO==0.7.1
+Flask==3.1.1
+Flask-Cors==4.0.1
+# SocketIO removed for stability on Pi; re-add with pinned versions if needed:
+# Flask-SocketIO==5.3.6
+# python-socketio==5.8.0
+# python-engineio==4.3.4
+Pillow==10.4.0
+adafruit-circuitpython-ssd1306==2.12.0
+psutil==6.0.0
+Werkzeug==3.1.3
+Click==8.2.1
+Jinja2==3.1.6
+itsdangerous==2.2.0
+MarkupSafe==3.0.2

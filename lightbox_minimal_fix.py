@@ -11,9 +11,10 @@ This script applies only the essential fixes to resolve the main issues:
 This is a minimal, safe fix that doesn't restructure existing code.
 """
 
+import json
 import subprocess
 import time
-import json
+
 
 def log(message):
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -26,7 +27,7 @@ def get_current_code():
             "ssh", "joshuafield@192.168.0.98",
             "cat /home/joshuafield/LightBox/lightbox_complete.py"
         ], capture_output=True, text=True, timeout=15)
-        
+
         if result.returncode == 0:
             return result.stdout
         else:
@@ -39,11 +40,11 @@ def get_current_code():
 def apply_minimal_fixes(code):
     """Apply minimal, safe fixes"""
     log("Applying minimal fixes...")
-    
+
     # Fix 1: Add missing /api/optimization/config endpoint (simple version)
     if "/api/optimization/config" not in code:
         log("→ Adding missing /api/optimization/config endpoint")
-        
+
         # Find a good insertion point (after existing API routes)
         insertion_point = code.find("@app.route('/api/optimization/update'")
         if insertion_point > 0:
@@ -73,11 +74,11 @@ def apply_minimal_fixes(code):
 
     '''
             code = code[:insertion_point] + new_endpoint + code[insertion_point:]
-    
+
     # Fix 2: Add simple gamma correction function
     if "def apply_gamma_correction(" not in code:
         log("→ Adding gamma correction function")
-        
+
         gamma_function = '''
 def apply_gamma_correction(r, g, b, gamma=2.2):
     """Apply gamma correction to RGB values"""
@@ -106,73 +107,73 @@ def apply_gamma_correction(r, g, b, gamma=2.2):
         for i, line in enumerate(lines):
             if line.startswith('import ') or line.startswith('from '):
                 import_end = i + 1
-        
+
         lines.insert(import_end + 1, gamma_function)
         code = '\n'.join(lines)
-    
+
     # Fix 3: Fix the black background in starfield (simple fix)
     if "(0, 0, 5)" in code:
         log("→ Fixing black color rendering")
         code = code.replace("(0, 0, 5)", "(0, 0, 0)")  # True black instead of dark blue
-    
+
     log("✓ Minimal fixes applied")
     return code
 
 def deploy_minimal_fix():
     """Deploy the minimal fix"""
     log("=== LightBox Minimal Fix ===")
-    
+
     # Get current code
     log("Getting current code...")
     code = get_current_code()
     if not code:
         return False
-    
+
     # Apply fixes
     fixed_code = apply_minimal_fixes(code)
-    
+
     # Save locally
     with open("lightbox_minimal_fixed.py", "w") as f:
         f.write(fixed_code)
     log("✓ Created minimal fix locally")
-    
+
     # Deploy
     try:
         log("Creating backup...")
         subprocess.run([
             "ssh", "joshuafield@192.168.0.98",
-            f"cp /home/joshuafield/LightBox/lightbox_complete.py /home/joshuafield/LightBox/lightbox_complete.py.backup.minimal.$(date +%s)"
+            "cp /home/joshuafield/LightBox/lightbox_complete.py /home/joshuafield/LightBox/lightbox_complete.py.backup.minimal.$(date +%s)"
         ], check=True)
-        
+
         log("Uploading minimal fix...")
         subprocess.run([
             "scp", "lightbox_minimal_fixed.py",
             "joshuafield@192.168.0.98:/home/joshuafield/LightBox/lightbox_complete.py"
         ], check=True)
-        
+
         log("Restarting service...")
         subprocess.run([
             "ssh", "joshuafield@192.168.0.98",
             "sudo systemctl restart lightbox"
         ], check=True)
-        
+
         # Wait and verify
         time.sleep(5)
         log("Verifying fix...")
-        
+
         # Test the API endpoint
         result = subprocess.run([
             "curl", "-s", "http://192.168.0.98:8888/api/optimization/config"
         ], capture_output=True, text=True, timeout=5)
-        
+
         if result.returncode == 0 and "complexity" in result.stdout:
             log("✓ /api/optimization/config endpoint working!")
-            
+
             # Check animation is still running
             result2 = subprocess.run([
                 "curl", "-s", "http://192.168.0.98:8888/api/status"
             ], capture_output=True, text=True, timeout=5)
-            
+
             if result2.returncode == 0:
                 status = json.loads(result2.stdout)
                 frame_count = status.get('frame_count', 0)
@@ -180,17 +181,17 @@ def deploy_minimal_fix():
                     log(f"✓ Animation running (frame: {frame_count})")
                     log("🎉 Minimal fix successful!")
                     return True
-        
+
         log("⚠ Fix deployed but verification failed")
         return False
-        
+
     except Exception as e:
         log(f"ERROR during deployment: {e}")
         return False
 
 if __name__ == "__main__":
     success = deploy_minimal_fix()
-    
+
     if success:
         print("\n✅ Minimal fix completed successfully!")
         print("Fixed issues:")
@@ -203,4 +204,4 @@ if __name__ == "__main__":
         print("3. Verify true black colors in animations")
     else:
         print("\n❌ Minimal fix failed")
-        print("The service should still be running with the backup version.") 
+        print("The service should still be running with the backup version.")

@@ -8,7 +8,6 @@ This loop fixes the timing and double buffering issues identified in the audit.
 import time
 import threading
 import logging
-from typing import Callable, Any
 
 logger = logging.getLogger(__name__)
 

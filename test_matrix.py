@@ -3,8 +3,9 @@
 Simple test script for HUB75 LED matrix
 """
 
-import time
 import sys
+import time
+
 from rgbmatrix import RGBMatrix, RGBMatrixOptions
 
 # Configuration for the matrix
@@ -23,32 +24,32 @@ matrix = RGBMatrix(options=options)
 
 try:
     print("Press CTRL-C to stop")
-    
+
     # Fill the matrix with red
     for x in range(options.cols):
         for y in range(options.rows):
             matrix.SetPixel(x, y, 255, 0, 0)
-    
+
     time.sleep(2)
-    
+
     # Fill the matrix with green
     for x in range(options.cols):
         for y in range(options.rows):
             matrix.SetPixel(x, y, 0, 255, 0)
-    
+
     time.sleep(2)
-    
+
     # Fill the matrix with blue
     for x in range(options.cols):
         for y in range(options.rows):
             matrix.SetPixel(x, y, 0, 0, 255)
-    
+
     time.sleep(2)
-    
+
     # Clear the matrix
     matrix.Clear()
-    
+
 except KeyboardInterrupt:
     print("Exiting...")
     matrix.Clear()
-    sys.exit(0) 
+    sys.exit(0)

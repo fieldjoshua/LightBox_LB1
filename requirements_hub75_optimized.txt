@@ -1,0 +1,17 @@
+# 🌈 LightBox HUB75 Optimized - Requirements
+# ==========================================
+
+# Core dependencies
+flask>=2.3.0
+flask-cors>=4.0.0
+
+# Optional: RGB Matrix library (install separately on Pi)
+# rpi-rgb-led-matrix  # Installed via: sudo pip3 install rpi-rgb-led-matrix
+
+# Development dependencies (optional)
+requests>=2.31.0  # For API testing
+
+# System packages required on Raspberry Pi:
+# sudo apt-get update
+# sudo apt-get install python3-dev python3-pip
+# sudo apt-get install libatlas-base-dev 

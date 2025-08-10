@@ -10,9 +10,9 @@ where frame operations are no-ops but retain the same public interface.
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 import logging
 import time
+from types import SimpleNamespace
 
 from .hardware_config import HardwareConfig
 
@@ -21,8 +21,10 @@ logger = logging.getLogger(__name__)
 try:
     # The official Henner Zeller library. Import guarded so that development
     # on non-Pi hosts does not raise ImportError.
-    from rgbmatrix import RGBMatrix  # type: ignore
-    from rgbmatrix import RGBMatrixOptions  # type: ignore
+    from rgbmatrix import (
+        RGBMatrix,  # type: ignore
+        RGBMatrixOptions,  # type: ignore
+    )
 
     _HARDWARE_AVAILABLE = True
 except ModuleNotFoundError:  # pragma: no cover – CI runners lack the module
@@ -35,21 +37,21 @@ except ModuleNotFoundError:  # pragma: no cover – CI runners lack the module
     # Lightweight stub objects that match the API shape used below. They let us
     # exercise application logic and unit tests without real hardware.
     class _SimCanvas(SimpleNamespace):
-        def Clear(self) -> None:  # noqa: D401 – simple stub verb
+        def Clear(self) -> None:
             """Pretend to clear the panel."""
 
     class _SimMatrix(SimpleNamespace):
         width: int = 64
         height: int = 64
 
-        def CreateFrameCanvas(self) -> _SimCanvas:  # noqa: D401 – simple stub verb
+        def CreateFrameCanvas(self) -> _SimCanvas:
             return _SimCanvas()
 
-        def SwapOnVSync(self, _canvas: _SimCanvas) -> _SimCanvas:  # noqa: D401
+        def SwapOnVSync(self, _canvas: _SimCanvas) -> _SimCanvas:
             # Swap is instantaneous in simulation; just return same canvas.
             return _canvas
 
-        def Clear(self) -> None:  # noqa: D401 – simple stub verb
+        def Clear(self) -> None:
             """No-op clear."""
 
 
@@ -83,7 +85,7 @@ class MatrixController:
             self._matrix = _SimMatrix(width=hw_cfg.cols, height=hw_cfg.rows)
             self._canvas = self._matrix.CreateFrameCanvas()
             logger.info(
-                "Initialised *simulated* RGBMatrix: %sx%s",  # noqa: E501
+                "Initialised *simulated* RGBMatrix: %sx%s",
                 hw_cfg.cols,
                 hw_cfg.rows,
             )
@@ -93,12 +95,12 @@ class MatrixController:
     # ------------------------------------------------------------------
 
     @property
-    def width(self) -> int:  # noqa: D401 – simple accessor verb
+    def width(self) -> int:
         """Return matrix width in pixels."""
         return self.hw_cfg.cols
 
     @property
-    def height(self) -> int:  # noqa: D401 – simple accessor verb
+    def height(self) -> int:
         """Return matrix height in pixels."""
         return self.hw_cfg.rows
 
@@ -135,7 +137,7 @@ class MatrixController:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _create_matrix(self):  # noqa: D401 – internal helper verb
+    def _create_matrix(self):
         if not _HARDWARE_AVAILABLE:  # pragma: no cover – guarded earlier
             raise RuntimeError("_create_matrix called without rgbmatrix present")
 
@@ -163,4 +165,4 @@ class MatrixController:
         if self.hw_cfg.multiplexing:
             opts.multiplexing = self.hw_cfg.multiplexing
 
-        return RGBMatrix(options=opts) 
+        return RGBMatrix(options=opts)

@@ -15,13 +15,11 @@ Usage:
 The original file will be backed up with a .bak extension.
 """
 
-import os
-import sys
 import re
 import shutil
 import argparse
 from pathlib import Path
-from typing import Dict, List, Any, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional
 
 # Animation template with standard structure
 TEMPLATE = '''"""

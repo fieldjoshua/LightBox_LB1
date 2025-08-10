@@ -1,7 +1,7 @@
-from flask import (Blueprint, jsonify, request,
-                   render_template, current_app, send_from_directory)
-import os
 import json
+import os
+
+from flask import Blueprint, current_app, jsonify, render_template, request, send_from_directory
 from werkzeug.utils import secure_filename
 
 api_blueprint = Blueprint('api', __name__, template_folder='../web/templates')
@@ -21,7 +21,7 @@ def allowed_file(filename, file_types=None):
 def get_program_parameters(program_path):
     """Extract configurable parameters from a program file"""
     try:
-        with open(program_path, 'r') as f:
+        with open(program_path) as f:
             content = f.read()
 
         parameters = {}
@@ -299,7 +299,7 @@ def get_stats():
     """Get runtime statistics"""
     try:
         if os.path.exists('/tmp/lightbox_stats.json'):
-            with open('/tmp/lightbox_stats.json', 'r') as f:
+            with open('/tmp/lightbox_stats.json') as f:
                 stats = json.load(f)
             return jsonify(stats)
         return jsonify({'error': 'Stats not available'}), 404
@@ -371,7 +371,7 @@ def load_preset():
         preset_name = data.get('name', 'default')
         preset_file = os.path.join('presets', f"{preset_name}.json")
         if os.path.exists(preset_file):
-            with open(preset_file, 'r') as f:
+            with open(preset_file) as f:
                 preset_data = json.load(f)
             led_controller.update_config(preset_data)
             led_controller.config.save_settings()
@@ -394,4 +394,4 @@ def list_presets():
                     presets.append(filename[:-5])
         return jsonify({'presets': presets})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500 
+        return jsonify({'error': str(e)}), 500

@@ -4,15 +4,24 @@ Complete LightBox System with Embedded Animations and Web Interface
 Bypasses all file permission issues by embedding everything in one script.
 """
 
-import sys
-import time
 import math
-import threading
-import signal
 from pathlib import Path
+import signal
+import sys
+import threading
+import time
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+
+# Import optimized components
+try:
+    from core.optimized_animation_loop import OptimizedAnimationLoop
+    from core.optimized_matrix_controller import OptimizedMatrixController
+    OPTIMIZED_AVAILABLE = True
+except ImportError:
+    OPTIMIZED_AVAILABLE = False
+    print("⚠️  Optimized components not available, using standard loop")
 
 # Embedded ConfigManager and Conductor - no external dependencies
 
@@ -28,7 +37,7 @@ class ConfigManager:
                 "hardware_mapping": "adafruit-hat"
             }
         }
-    
+
     def get(self, key, default=None):
         keys = key.split('.')
         value = self.config
@@ -44,49 +53,50 @@ class Conductor:
         self.config = config_manager
         self.matrix = None
         self.current_animation = None
+        self.current_animation_func = None
         self.frame_count = 0
         self.pixels = None
         self.width = self.config.get('hub75.cols', 64)
         self.height = self.config.get('hub75.rows', 64)
         self.pixels = [(0, 0, 0)] * (self.width * self.height)
-        
+
         # Initialize RGB matrix
         self._init_matrix()
-    
+
     def _init_matrix(self):
         """Initialize the RGB matrix with optimized display parameters."""
         try:
             from rgbmatrix import RGBMatrix, RGBMatrixOptions
             options = RGBMatrixOptions()
-            
+
             # Basic configuration
             options.rows = self.height
             options.cols = self.width
             options.chain_length = 1
             options.parallel = 1
             options.hardware_mapping = self.config.get('hub75.hardware_mapping', 'adafruit-hat')
-            
+
             # ANTI-JITTER OPTIMIZATION SETTINGS
             # Prioritize refresh rate over color depth for smooth display
             # --------------------------------------------------
-            
+
             # PWM bits: REDUCED for faster refresh (smooth over color depth)
             # Guide: "fewer PWM bits = higher refresh rate"
             options.pwm_bits = self.config.get('hub75.pwm_bits', 8)  # Was 11
-            
+
             # PWM timing: FASTER for reduced latency
-            # Guide: "lower values = faster refresh"  
+            # Guide: "lower values = faster refresh"
             options.pwm_lsb_nanoseconds = self.config.get(
                 'hub75.pwm_lsb_nanoseconds', 100)  # Was 130
-            
+
             # PWM dithering: HIGHER to compensate for lower PWM bits
             # Spreads color error over frames for smoother appearance
             options.pwm_dither_bits = self.config.get('hub75.pwm_dither_bits', 2)  # Was 1
-            
+
             # GPIO slowdown: OPTIMIZED for Pi 3B+ timing
             # Guide suggests fine-tuning this value
             options.gpio_slowdown = self.config.get('hub75.gpio_slowdown', 3)  # Was 4
-            
+
             # Hardware PWM: Use your jumper mod for flicker-free display
             # Your jumper mod enables this - eliminates software PWM flicker!
             hardware_pwm = self.config.get('hub75.hardware_pwm', 'auto')
@@ -96,67 +106,68 @@ class Conductor:
             else:
                 options.disable_hardware_pulsing = True   # Use software PWM
                 print("⚠️  Software PWM - consider jumper mod for quality")
-            
+
             # Refresh rate limiting: Prevents timing issues under load
             limit_refresh = self.config.get('hub75.limit_refresh', 120)
             if hasattr(options, 'limit_refresh_rate_hz'):
                 options.limit_refresh_rate_hz = limit_refresh
                 print(f"🎯 Refresh rate limited to {limit_refresh} Hz")
-            
+
             # Brightness (0-100%)
             options.brightness = int(self.config.get('brightness', 0.8) * 100)
-            
+
             # Panel-specific anti-jitter settings
             # These vary by manufacturer - trying common 64x64 values
             scan_mode = self.config.get('hub75.scan_mode', 1)  # Try interlaced
             if scan_mode > 0:
                 options.scan_mode = scan_mode
                 print(f"🔄 Scan mode: {scan_mode} (0=progressive, 1=interlaced)")
-            
+
             row_address_type = self.config.get('hub75.row_address_type', 2)  # Common for 64x64
             if row_address_type > 0:
                 options.row_address_type = row_address_type
                 print(f"📍 Row addressing: {row_address_type}")
-            
-            multiplexing = self.config.get('hub75.multiplexing', 8)  # Common for 64x64  
+
+            multiplexing = self.config.get('hub75.multiplexing', 8)  # Common for 64x64
             if multiplexing > 0:
                 options.multiplexing = multiplexing
                 print(f"🔀 Multiplexing: {multiplexing}")
-            
+
             # Create matrix with optimized settings
             self.matrix = RGBMatrix(options=options)
-            
+
             # Add gamma correction for smooth color transitions
             self.gamma = 2.2
             self._gamma_table = [int(255 * pow(i / 255.0, 1.0 / self.gamma)) for i in range(256)]
-            
+
             print(f"✅ HUB75 Matrix initialized: {self.width}x{self.height}")
             print(f"🎨 Display optimizations: PWM bits={options.pwm_bits}, "
                   f"Dither={options.pwm_dither_bits}, Gamma={self.gamma}")
-            
+
         except ImportError:
             print("⚠️  RGB Matrix library not available - using mock display")
             self.matrix = None
             self.gamma = 2.2
             self._gamma_table = [int(255 * pow(i / 255.0, 1.0 / self.gamma)) for i in range(256)]
-    
+
     def set_animation(self, name):
         """Set the current animation."""
         if name in EMBEDDED_ANIMATIONS:
             self.current_animation = name
+            self.current_animation_func = EMBEDDED_ANIMATIONS[name]
             self.frame_count = 0  # Reset frame counter for new animation
             print(f"✅ Animation set to: {name}")
             return True
         return False
-    
+
     def update_frame(self):
         """Update the current frame."""
-        if (self.current_animation and 
+        if (self.current_animation and
                 self.current_animation in EMBEDDED_ANIMATIONS):
             # Run the animation
             EMBEDDED_ANIMATIONS[self.current_animation](
                 self.pixels, self.config, self.frame_count)
-            
+
             # Update matrix display
             if self.matrix:
                 self.matrix.Clear()
@@ -166,7 +177,7 @@ class Conductor:
                         if pixel_index < len(self.pixels):
                             r, g, b = self.pixels[pixel_index]
                             self.matrix.SetPixel(x, y, r, g, b)
-            
+
             self.frame_count += 1
 
 
@@ -186,19 +197,19 @@ def aurora_animation(pixels, config, frame):
     """Aurora borealis animation with flowing colors."""
     width = config.get('hub75.cols', 64)
     height = config.get('hub75.rows', 64)
-    
+
     for y in range(height):
         for x in range(width):
             # Create flowing aurora effect
             wave1 = math.sin((x * 0.1) + (frame * 0.02)) * 0.5 + 0.5
             wave2 = math.sin((y * 0.15) + (frame * 0.03)) * 0.5 + 0.5
             wave3 = math.sin(((x + y) * 0.08) + (frame * 0.01)) * 0.5 + 0.5
-            
+
             # Aurora colors: green, blue, purple
             r = int(wave3 * wave1 * 100)
             g = int(wave1 * wave2 * 255)
             b = int(wave2 * wave3 * 200)
-            
+
             pixel_index = y * width + x
             if pixel_index < len(pixels):
                 pixels[pixel_index] = (r, g, b)
@@ -208,7 +219,7 @@ def plasma_animation(pixels, config, frame):
     """Plasma effect animation."""
     width = config.get('hub75.cols', 64)
     height = config.get('hub75.rows', 64)
-    
+
     for y in range(height):
         for x in range(width):
             # Multiple sine waves for plasma effect
@@ -217,15 +228,15 @@ def plasma_animation(pixels, config, frame):
             value += math.sin((x + y) * 0.25 + frame * 0.08)
             value += math.sin(math.sqrt(x*x + y*y) * 0.1 + frame * 0.2)
             value = (value + 4) / 8  # Normalize to 0-1
-            
+
             # Convert to RGB with color cycling
             hue = (value + frame * 0.01) % 1.0
-            
+
             # HSV to RGB conversion
             h = hue * 6.0
             c = 1.0
             x_val = c * (1 - abs((h % 2) - 1))
-            
+
             if h < 1:
                 r, g, b = c, x_val, 0
             elif h < 2:
@@ -238,11 +249,11 @@ def plasma_animation(pixels, config, frame):
                 r, g, b = x_val, 0, c
             else:
                 r, g, b = c, 0, x_val
-            
+
             r = int(r * 255)
             g = int(g * 255)
             b = int(b * 255)
-            
+
             pixel_index = y * width + x
             if pixel_index < len(pixels):
                 pixels[pixel_index] = (r, g, b)
@@ -252,19 +263,19 @@ def fire_animation(pixels, config, frame):
     """Fire effect animation."""
     width = config.get('hub75.cols', 64)
     height = config.get('hub75.rows', 64)
-    
+
     for y in range(height):
         for x in range(width):
             # Fire effect - hotter at bottom, cooler at top
             base_heat = (height - y) / height
-            
+
             # Add noise and movement
             noise = math.sin(x * 0.3 + frame * 0.1) * 0.2
             noise += math.sin(y * 0.2 + frame * 0.15) * 0.1
-            
+
             heat = base_heat + noise
             heat = max(0, min(1, heat))
-            
+
             # Fire colors: red to orange to yellow
             if heat < 0.5:
                 r = int(heat * 2 * 255)
@@ -274,7 +285,7 @@ def fire_animation(pixels, config, frame):
                 r = 255
                 g = int(100 + (heat - 0.5) * 2 * 155)
                 b = int((heat - 0.5) * 2 * 50)
-            
+
             pixel_index = y * width + x
             if pixel_index < len(pixels):
                 pixels[pixel_index] = (r, g, b)
@@ -284,23 +295,23 @@ def ocean_animation(pixels, config, frame):
     """Ocean waves animation."""
     width = config.get('hub75.cols', 64)
     height = config.get('hub75.rows', 64)
-    
+
     for y in range(height):
         for x in range(width):
             # Multiple wave layers
             wave1 = math.sin(x * 0.15 + frame * 0.05) * 0.3
             wave2 = math.sin(x * 0.1 + y * 0.1 + frame * 0.03) * 0.2
             wave3 = math.sin(x * 0.05 + frame * 0.02) * 0.5
-            
+
             # Ocean depth effect
             depth = (y / height) + wave1 + wave2 + wave3
             depth = max(0, min(1, depth))
-            
+
             # Ocean colors: dark blue to light blue to white
             r = int(depth * 50)
             g = int(50 + depth * 100)
             b = int(100 + depth * 155)
-            
+
             pixel_index = y * width + x
             if pixel_index < len(pixels):
                 pixels[pixel_index] = (r, g, b)
@@ -310,17 +321,17 @@ def rainbow_animation(pixels, config, frame):
     """Rainbow wave animation."""
     width = config.get('hub75.cols', 64)
     height = config.get('hub75.rows', 64)
-    
+
     for y in range(height):
         for x in range(width):
             # Moving rainbow
             hue = ((x + y + frame) % 360) / 360.0
-            
+
             # HSV to RGB
             h = hue * 6.0
             c = 1.0
             x_val = c * (1 - abs((h % 2) - 1))
-            
+
             if h < 1:
                 r, g, b = c, x_val, 0
             elif h < 2:
@@ -333,11 +344,11 @@ def rainbow_animation(pixels, config, frame):
                 r, g, b = x_val, 0, c
             else:
                 r, g, b = c, 0, x_val
-            
+
             r = int(r * 255)
             g = int(g * 255)
             b = int(b * 255)
-            
+
             pixel_index = y * width + x
             if pixel_index < len(pixels):
                 pixels[pixel_index] = (r, g, b)
@@ -347,31 +358,31 @@ def matrix_rain_animation(pixels, config, frame):
     """Matrix-style digital rain animation - optimized for HUB75."""
     width = config.get('hub75.cols', 64)
     height = config.get('hub75.rows', 64)
-    
+
     # Clear background
     for i in range(len(pixels)):
         pixels[i] = (0, 0, 0)
-    
+
     # Create falling streams
     for stream in range(width // 3):
         x = (stream * 3 + (frame // 10) % 3) % width
-        
+
         # Stream parameters
         speed = 1 + (x % 3)
         offset = (frame * speed) % (height + 20)
-        
+
         # Draw stream
         for i in range(12):  # Stream length
             y = (offset - i * 2) % height
             if 0 <= y < height:
                 # Brightness fades along stream
                 brightness = max(0, 255 - i * 20)
-                
+
                 # Green matrix color with slight blue
                 r = 0
                 g = brightness
                 b = brightness // 4
-                
+
                 pixel_index = y * width + x
                 if pixel_index < len(pixels):
                     pixels[pixel_index] = (r, g, b)
@@ -383,33 +394,33 @@ def kaleidoscope_animation(pixels, config, frame):
     height = config.get('hub75.rows', 64)
     center_x = width // 2
     center_y = height // 2
-    
+
     for y in range(height):
         for x in range(width):
             # Distance from center
             dx = x - center_x
             dy = y - center_y
             distance = math.sqrt(dx * dx + dy * dy)
-            
+
             # Angle from center
             angle = math.atan2(dy, dx)
-            
+
             # Kaleidoscope effect with multiple rotations
             kaleidoscope_angle = (angle * 6 + frame * 0.05) % (math.pi * 2)
             wave = math.sin(distance * 0.3 + frame * 0.08)
-            
+
             # Multiple color layers
             hue1 = (kaleidoscope_angle / (math.pi * 2) + frame * 0.01) % 1.0
             hue2 = (distance * 0.1 + frame * 0.02) % 1.0
-            
+
             # Combine hues
             final_hue = (hue1 + hue2 * wave) % 1.0
-            
+
             # HSV to RGB with high saturation
             h = final_hue * 6.0
             c = 0.8 + wave * 0.2  # Variable saturation
             x_val = c * (1 - abs((h % 2) - 1))
-            
+
             if h < 1:
                 r, g, b = c, x_val, 0
             elif h < 2:
@@ -422,14 +433,14 @@ def kaleidoscope_animation(pixels, config, frame):
                 r, g, b = x_val, 0, c
             else:
                 r, g, b = c, 0, x_val
-            
+
             # Brightness based on distance
             brightness = (1 - min(1, distance / 32)) * 255
-            
+
             r = int(r * brightness)
             g = int(g * brightness)
             b = int(b * brightness)
-            
+
             pixel_index = y * width + x
             if pixel_index < len(pixels):
                 pixels[pixel_index] = (r, g, b)
@@ -441,11 +452,11 @@ def starfield_animation(pixels, config, frame):
     height = config.get('hub75.rows', 64)
     center_x = width // 2
     center_y = height // 2
-    
+
     # Clear background
     for i in range(len(pixels)):
         pixels[i] = (0, 0, 5)  # Dark blue space
-    
+
     # Create moving stars
     star_count = 100
     for star in range(star_count):
@@ -454,27 +465,27 @@ def starfield_animation(pixels, config, frame):
         star_x = (seed * 31) % 200 - 100  # -100 to 100
         star_y = (seed * 47) % 200 - 100
         star_z = (seed * 13) % 100 + 1    # 1 to 100
-        
+
         # Move star towards viewer
         z = star_z - (frame * 2) % 100
         if z <= 0:
             z = 100
-        
+
         # Project 3D to 2D
         screen_x = int(center_x + star_x * 32 / z)
         screen_y = int(center_y + star_y * 32 / z)
-        
+
         # Check if star is on screen
         if 0 <= screen_x < width and 0 <= screen_y < height:
             # Star brightness based on distance
             brightness = int(255 * (1 - z / 100))
-            
+
             # Star color - white to blue based on speed
             speed_factor = (100 - z) / 100
             r = brightness
             g = brightness
             b = int(brightness * (1 + speed_factor))
-            
+
             pixel_index = screen_y * width + screen_x
             if pixel_index < len(pixels):
                 pixels[pixel_index] = (r, g, b)
@@ -484,7 +495,7 @@ def clouds_animation(pixels, config, frame):
     """Peaceful clouds drifting across blue sky - optimized for HUB75."""
     width = config.get('hub75.cols', 64)
     height = config.get('hub75.rows', 64)
-    
+
     for y in range(height):
         for x in range(width):
             # Blue sky gradient - darker at top, lighter at bottom
@@ -492,29 +503,29 @@ def clouds_animation(pixels, config, frame):
             base_r = int(100 * sky_gradient)
             base_g = int(150 * sky_gradient)
             base_b = int(255 * sky_gradient)
-            
+
             # Create multiple cloud layers
             cloud_density = 0
-            
+
             # Cloud layer 1 - large slow clouds
             cloud1_x = (x + frame * 0.5) % (width * 2)
             cloud1_noise = math.sin(cloud1_x * 0.1) * math.sin(y * 0.15)
             cloud1_noise += math.sin(cloud1_x * 0.05) * math.sin(y * 0.08)
             cloud1_strength = max(0, cloud1_noise - 0.3) * 2
             cloud_density += cloud1_strength
-            
+
             # Cloud layer 2 - smaller faster clouds
             cloud2_x = (x + frame * 0.8) % (width * 1.5)
             cloud2_noise = math.sin(cloud2_x * 0.15) * math.sin(y * 0.2)
             cloud2_strength = max(0, cloud2_noise - 0.5) * 1.5
             cloud_density += cloud2_strength
-            
+
             # Cloud layer 3 - wispy high clouds
             cloud3_x = (x + frame * 0.3) % (width * 3)
             cloud3_noise = math.sin(cloud3_x * 0.08) * math.sin(y * 0.12)
             cloud3_strength = max(0, cloud3_noise - 0.4) * 1
             cloud_density += cloud3_strength
-            
+
             # Apply clouds to sky
             cloud_factor = min(1, cloud_density)
             if cloud_factor > 0:
@@ -522,14 +533,14 @@ def clouds_animation(pixels, config, frame):
                 cloud_r = int(255 * cloud_factor)
                 cloud_g = int(255 * cloud_factor)
                 cloud_b = int(230 * cloud_factor)
-                
+
                 # Blend clouds with sky
                 r = int(base_r * (1 - cloud_factor) + cloud_r * cloud_factor)
                 g = int(base_g * (1 - cloud_factor) + cloud_g * cloud_factor)
                 b = int(base_b * (1 - cloud_factor) + cloud_b * cloud_factor)
             else:
                 r, g, b = base_r, base_g, base_b
-            
+
             pixel_index = y * width + x
             if pixel_index < len(pixels):
                 pixels[pixel_index] = (r, g, b)
@@ -539,11 +550,11 @@ def fireworks_animation(pixels, config, frame):
     """Fireworks bursting in the distance - optimized for HUB75."""
     width = config.get('hub75.cols', 64)
     height = config.get('hub75.rows', 64)
-    
+
     # Dark night sky
     for i in range(len(pixels)):
         pixels[i] = (5, 5, 15)  # Deep blue night
-    
+
     # Multiple firework bursts
     firework_count = 3
     for fw in range(firework_count):
@@ -551,25 +562,25 @@ def fireworks_animation(pixels, config, frame):
         fw_time = (frame + fw * 60) % 180
         fw_x = 20 + fw * 20
         fw_y = 15 + fw * 15
-        
+
         if fw_time < 120:  # Firework is active
             # Explosion phase
             explosion_radius = min(25, fw_time * 0.3)
-            
+
             # Create burst particles
             particle_count = 24
             for p in range(particle_count):
                 angle = (p / particle_count) * 2 * math.pi
-                
+
                 # Particle position
                 px = fw_x + math.cos(angle) * explosion_radius
                 py = fw_y + math.sin(angle) * explosion_radius
-                
+
                 # Check bounds
                 if 0 <= px < width and 0 <= py < height:
                     # Particle fade over time
                     fade = max(0, 1 - fw_time / 120)
-                    
+
                     # Firework colors - cycle through different colors per firework
                     if fw == 0:  # Red firework
                         r = int(255 * fade)
@@ -583,13 +594,13 @@ def fireworks_animation(pixels, config, frame):
                         r = int(200 * fade)
                         g = int(200 * fade)
                         b = int(255 * fade)
-                    
+
                     # Add sparkle effect
                     if fw_time % 6 < 3:
                         r = min(255, int(r * 1.5))
                         g = min(255, int(g * 1.5))
                         b = min(255, int(b * 1.5))
-                    
+
                     pixel_index = int(py) * width + int(px)
                     if 0 <= pixel_index < len(pixels):
                         # Additive blending for overlapping fireworks
@@ -599,7 +610,7 @@ def fireworks_animation(pixels, config, frame):
                             min(255, old_g + g),
                             min(255, old_b + b)
                         )
-            
+
             # Add center bright flash
             if fw_time < 20:
                 flash_intensity = int(255 * (1 - fw_time / 20))
@@ -614,12 +625,12 @@ def hyperspace_animation(pixels, config, frame):
     height = config.get('hub75.rows', 64)
     center_x = width // 2
     center_y = height // 2
-    
+
     # 120 BPM = 2 beats per second = 10 frames per beat at 20 FPS
     beat_frame = 10
     beat_cycle = frame % beat_frame
     beat_intensity = 1.0
-    
+
     # Thrust effect on beats 0, 2, 4, 6, 8 (strong beats)
     if beat_cycle < 2:
         beat_intensity = 3.0 + (2 - beat_cycle) * 2  # Intense thrust
@@ -627,7 +638,7 @@ def hyperspace_animation(pixels, config, frame):
         beat_intensity = 2.0  # Acceleration phase
     else:
         beat_intensity = 1.0  # Cruise phase
-    
+
     # Clear background - deep space
     for i in range(len(pixels)):
         # Thrust glow effect during beats
@@ -636,7 +647,7 @@ def hyperspace_animation(pixels, config, frame):
             pixels[i] = (glow, glow // 2, glow // 4)  # Orange thrust glow
         else:
             pixels[i] = (0, 0, 5)  # Deep space
-    
+
     # Create high-speed starfield
     star_count = 150
     for star in range(star_count):
@@ -645,17 +656,17 @@ def hyperspace_animation(pixels, config, frame):
         star_x = (seed * 31) % 200 - 100  # -100 to 100
         star_y = (seed * 47) % 200 - 100
         star_z = (seed * 13) % 50 + 1     # 1 to 50 (closer = faster)
-        
+
         # Move star towards viewer with beat acceleration
         speed_multiplier = beat_intensity
         z = star_z - (frame * speed_multiplier) % 50
         if z <= 0:
             z = 50
-        
+
         # Project 3D to 2D with perspective
         screen_x = int(center_x + star_x * 32 / z)
         screen_y = int(center_y + star_y * 32 / z)
-        
+
         # Create star trails during thrust
         trail_length = int(beat_intensity * 3)
         for trail in range(trail_length):
@@ -664,13 +675,13 @@ def hyperspace_animation(pixels, config, frame):
             if trail_z > 0:
                 trail_x = int(center_x + star_x * 32 / trail_z)
                 trail_y = int(center_y + star_y * 32 / trail_z)
-                
+
                 # Check if trail point is on screen
                 if 0 <= trail_x < width and 0 <= trail_y < height:
                     # Trail brightness decreases with distance
                     trail_brightness = max(0, 255 - trail * 50)
                     trail_brightness = int(trail_brightness * (1 - trail_z / 50))
-                    
+
                     # Color changes with speed
                     if beat_intensity > 2:  # Hyperspace mode
                         # Blue-white hyperspace streaks
@@ -680,7 +691,7 @@ def hyperspace_animation(pixels, config, frame):
                     else:
                         # Normal white stars
                         r = g = b = trail_brightness
-                    
+
                     pixel_index = trail_y * width + trail_x
                     if pixel_index < len(pixels):
                         # Additive blending for bright streaks
@@ -690,13 +701,13 @@ def hyperspace_animation(pixels, config, frame):
                             min(255, old_g + g),
                             min(255, old_b + b)
                         )
-        
+
         # Main star position
         if 0 <= screen_x < width and 0 <= screen_y < height:
             # Star brightness based on distance and beat
             brightness = int(255 * (1 - z / 50) * beat_intensity)
             brightness = min(255, brightness)
-            
+
             # Color shifts during hyperdrive
             if beat_intensity > 2.5:
                 # Intense blue-white during thrust
@@ -711,7 +722,7 @@ def hyperspace_animation(pixels, config, frame):
             else:
                 # Pure white during cruise
                 r = g = b = brightness
-            
+
             pixel_index = screen_y * width + screen_x
             if pixel_index < len(pixels):
                 # Additive blending
@@ -729,14 +740,14 @@ def golden_ratio_animation(pixels, config, frame):
     height = config.get('hub75.rows', 64)
     center_x = width // 2
     center_y = height // 2
-    
+
     # Clear background
     for i in range(len(pixels)):
         pixels[i] = (5, 5, 15)  # Deep purple background
-    
+
     # Golden ratio constant
     phi = 1.618033988749
-    
+
     # Create multiple golden spirals at different scales
     spiral_count = 3
     for spiral_num in range(spiral_count):
@@ -744,34 +755,34 @@ def golden_ratio_animation(pixels, config, frame):
         scale = 0.5 + spiral_num * 0.3
         rotation_offset = spiral_num * (2 * math.pi / spiral_count)
         speed_multiplier = 1 + spiral_num * 0.5
-        
+
         # Spiral center orbits around main center
         orbit_radius = 15 + spiral_num * 8
         orbit_angle = (frame * 0.02 * speed_multiplier + rotation_offset) % (2 * math.pi)
         spiral_center_x = center_x + math.cos(orbit_angle) * orbit_radius
         spiral_center_y = center_y + math.sin(orbit_angle) * orbit_radius
-        
+
         # Draw golden spiral
         points = 200
         for i in range(points):
             # Golden spiral equation: r = a * phi^(θ/π)
             theta = (i / points) * 6 * math.pi + (frame * 0.05 * speed_multiplier)
             r = scale * (phi ** (theta / math.pi)) * 2
-            
+
             # Spiral position
             x = spiral_center_x + math.cos(theta) * r
             y = spiral_center_y + math.sin(theta) * r
-            
+
             # Check if point is on screen
             if 0 <= x < width and 0 <= y < height:
                 # Color based on spiral number and position
                 hue = (spiral_num * 0.33 + i * 0.01 + frame * 0.005) % 1.0
-                
+
                 # HSV to RGB
                 h = hue * 6.0
                 c = 0.8
                 x_val = c * (1 - abs((h % 2) - 1))
-                
+
                 if h < 1:
                     r_col, g_col, b_col = c, x_val, 0
                 elif h < 2:
@@ -784,13 +795,13 @@ def golden_ratio_animation(pixels, config, frame):
                     r_col, g_col, b_col = x_val, 0, c
                 else:
                     r_col, g_col, b_col = c, 0, x_val
-                
+
                 # Brightness fades with distance from center
                 brightness = max(0.3, 1 - (i / points))
                 r_final = int(r_col * brightness * 255)
                 g_final = int(g_col * brightness * 255)
                 b_final = int(b_col * brightness * 255)
-                
+
                 pixel_index = int(y) * width + int(x)
                 if 0 <= pixel_index < len(pixels):
                     # Additive blending for intersection effects
@@ -800,33 +811,33 @@ def golden_ratio_animation(pixels, config, frame):
                         min(255, old_g + g_final),
                         min(255, old_b + b_final)
                     )
-        
+
         # Add golden ratio rectangles
         rect_count = 5
         for rect in range(rect_count):
             rect_scale = 3 + rect * 2
             rect_angle = (frame * 0.01 * speed_multiplier + rect * phi) % (2 * math.pi)
-            
+
             # Rectangle corners based on golden ratio
             w = rect_scale * phi
             h = rect_scale
-            
+
             corners = [
                 (-w/2, -h/2), (w/2, -h/2), (w/2, h/2), (-w/2, h/2)
             ]
-            
+
             # Rotate and translate rectangle
             for corner_idx in range(4):
                 x1, y1 = corners[corner_idx]
                 x2, y2 = corners[(corner_idx + 1) % 4]
-                
+
                 # Rotate points
                 cos_a, sin_a = math.cos(rect_angle), math.sin(rect_angle)
                 x1_rot = x1 * cos_a - y1 * sin_a + spiral_center_x
                 y1_rot = x1 * sin_a + y1 * cos_a + spiral_center_y
                 x2_rot = x2 * cos_a - y2 * sin_a + spiral_center_x
                 y2_rot = x2 * sin_a + y2 * cos_a + spiral_center_y
-                
+
                 # Draw line between corners
                 line_length = max(1, int(math.sqrt((x2_rot - x1_rot)**2 + (y2_rot - y1_rot)**2)))
                 for t in range(line_length):
@@ -834,13 +845,13 @@ def golden_ratio_animation(pixels, config, frame):
                         alpha = t / line_length
                         x = int(x1_rot + alpha * (x2_rot - x1_rot))
                         y = int(y1_rot + alpha * (y2_rot - y1_rot))
-                        
+
                         if 0 <= x < width and 0 <= y < height:
                             # Golden color for rectangles
                             r_rect = int(255 * 0.8)
                             g_rect = int(215 * 0.8)
                             b_rect = int(0 * 0.8)
-                            
+
                             pixel_index = y * width + x
                             if 0 <= pixel_index < len(pixels):
                                 old_r, old_g, old_b = pixels[pixel_index]
@@ -855,48 +866,48 @@ def dust_animation(pixels, config, frame):
     """Pixel-sized dust particles floating around the screen - optimized for HUB75."""
     width = config.get('hub75.cols', 64)
     height = config.get('hub75.rows', 64)
-    
+
     # Dark background with subtle gradient
     for y in range(height):
         for x in range(width):
             # Very subtle gradient from top to bottom
             gradient = int(5 + (y / height) * 10)
             pixels[y * width + x] = (gradient, gradient // 2, gradient // 4)
-    
+
     # Create floating dust particles
     dust_count = 200
     for dust in range(dust_count):
         # Pseudo-random particle properties based on dust index
         seed = dust * 127 + frame // 3
-        
+
         # Particle base position
         base_x = (seed * 31) % width
         base_y = (seed * 47) % height
-        
+
         # Floating motion with different speeds and patterns
         float_speed_x = 0.5 + (dust % 5) * 0.2
         float_speed_y = 0.3 + (dust % 7) * 0.15
-        
+
         # Brownian motion components
         brownian_x = math.sin((frame + dust * 17) * 0.1) * 2
         brownian_y = math.cos((frame + dust * 23) * 0.08) * 1.5
-        
+
         # Wind effect
         wind_x = math.sin(frame * 0.02) * 0.5
         wind_y = math.cos(frame * 0.015) * 0.3
-        
+
         # Final particle position
         x = (base_x + (frame * float_speed_x) + brownian_x + wind_x) % width
         y = (base_y + (frame * float_speed_y) + brownian_y + wind_y) % height
-        
+
         # Particle size (some particles are 2x2 pixels)
         particle_size = 1 if dust % 3 == 0 else 2
-        
+
         # Particle brightness varies
         brightness_base = 50 + (dust % 100)
         brightness_flicker = math.sin((frame + dust * 13) * 0.2) * 20
         brightness = int(max(30, min(200, brightness_base + brightness_flicker)))
-        
+
         # Particle color - mostly white/gray with some colored dust
         if dust % 10 == 0:  # 10% colored particles
             # Colored dust - warm colors
@@ -910,22 +921,22 @@ def dust_animation(pixels, config, frame):
             # Regular gray dust
             gray = int(brightness * (0.7 + math.sin(dust * 0.1) * 0.3))
             r, g, b = gray, gray, gray
-        
+
         # Draw particle
         for py in range(particle_size):
             for px in range(particle_size):
                 particle_x = int(x) + px
                 particle_y = int(y) + py
-                
+
                 if 0 <= particle_x < width and 0 <= particle_y < height:
                     pixel_index = particle_y * width + particle_x
-                    
+
                     # Size-based brightness adjustment
                     size_brightness = 1.0 if particle_size == 1 else 0.7
                     final_r = int(r * size_brightness)
                     final_g = int(g * size_brightness)
                     final_b = int(b * size_brightness)
-                    
+
                     # Additive blending for overlapping particles
                     old_r, old_g, old_b = pixels[pixel_index]
                     pixels[pixel_index] = (
@@ -939,42 +950,42 @@ def rain_animation(pixels, config, frame):
     """Realistic raindrops falling with splashes - optimized for HUB75."""
     width = config.get('hub75.cols', 64)
     height = config.get('hub75.rows', 64)
-    
+
     # Dark stormy sky background
     for y in range(height):
         for x in range(width):
             # Gradient from dark gray to lighter gray (storm clouds)
             sky_darkness = int(20 + (y / height) * 15)
             pixels[y * width + x] = (sky_darkness, sky_darkness, sky_darkness + 5)
-    
+
     # Create falling raindrops
     drop_count = 80
     for drop in range(drop_count):
         # Pseudo-random drop properties
         seed = drop * 97 + frame // 2
-        
+
         # Drop starting position and timing
         drop_x = (seed * 31) % width
         drop_speed = 2 + (drop % 4)  # Varying speeds
         drop_length = 3 + (drop % 3)  # Varying lengths
-        
+
         # Drop falls from top
         drop_start_frame = (seed * 13) % 120  # Stagger drop starts
         drop_y = ((frame - drop_start_frame) * drop_speed) % (height + drop_length + 10)
-        
+
         # Only draw if drop is on screen
         if -drop_length <= drop_y <= height:
             # Draw raindrop as a vertical line
             for segment in range(drop_length):
                 y = int(drop_y - segment)
-                
+
                 if 0 <= y < height:
                     # Raindrop color - blue-white
                     brightness = max(0, 255 - segment * 40)  # Fade along length
                     r = int(brightness * 0.6)
                     g = int(brightness * 0.8)
                     b = brightness
-                    
+
                     pixel_index = y * width + drop_x
                     if 0 <= pixel_index < len(pixels):
                         # Additive blending for overlapping drops
@@ -984,12 +995,12 @@ def rain_animation(pixels, config, frame):
                             min(255, old_g + g),
                             min(255, old_b + b)
                         )
-        
+
         # Create splash when drop hits bottom
         if height - 5 <= drop_y <= height:
             splash_frame = max(0, int(drop_y - (height - 5)))
             splash_size = splash_frame * 2
-            
+
             # Draw splash as expanding circle
             for splash_radius in range(1, splash_size + 1):
                 splash_points = splash_radius * 8  # Points around circle
@@ -997,16 +1008,16 @@ def rain_animation(pixels, config, frame):
                     angle = (point / splash_points) * 2 * math.pi
                     splash_x = int(drop_x + math.cos(angle) * splash_radius)
                     splash_y = int(height - 1 + math.sin(angle) * splash_radius * 0.3)  # Flatten splash
-                    
+
                     if 0 <= splash_x < width and 0 <= splash_y < height:
                         # Splash brightness fades with radius and time
                         splash_brightness = max(0, 150 - splash_radius * 30 - splash_frame * 20)
-                        
+
                         # Light blue splash color
                         r_splash = int(splash_brightness * 0.7)
                         g_splash = int(splash_brightness * 0.9)
                         b_splash = splash_brightness
-                        
+
                         pixel_index = splash_y * width + splash_x
                         if 0 <= pixel_index < len(pixels):
                             old_r, old_g, old_b = pixels[pixel_index]
@@ -1015,18 +1026,18 @@ def rain_animation(pixels, config, frame):
                                 min(255, old_g + g_splash),
                                 min(255, old_b + b_splash)
                             )
-    
+
     # Add lightning flashes occasionally
     lightning_chance = frame % 300  # Every 15 seconds
     if lightning_chance < 5:  # Brief flash
         flash_intensity = int(255 * (1 - lightning_chance / 5))
-        
+
         # Lightning illuminates the whole sky
         for y in range(height // 3):  # Top third of screen
             for x in range(width):
                 pixel_index = y * width + x
                 old_r, old_g, old_b = pixels[pixel_index]
-                
+
                 # Add white lightning flash
                 lightning_add = flash_intensity // 2
                 pixels[pixel_index] = (
@@ -1034,16 +1045,16 @@ def rain_animation(pixels, config, frame):
                     min(255, old_g + lightning_add),
                     min(255, old_b + lightning_add)
                 )
-        
+
         # Add lightning bolt
         if lightning_chance == 0:  # Only on first frame of flash
             bolt_x = width // 2 + (frame % 20) - 10
             bolt_segments = 8
-            
+
             for segment in range(bolt_segments):
                 bolt_y = segment * (height // bolt_segments)
                 bolt_x += (segment % 2) * 4 - 2  # Zigzag pattern
-                
+
                 if 0 <= bolt_x < width and 0 <= bolt_y < height:
                     # Bright white lightning bolt
                     for thickness in range(3):  # Make bolt 3 pixels wide
@@ -1079,7 +1090,7 @@ EMBEDDED_ANIMATIONS = {
 
 class LightBoxSystem:
     """Complete LightBox system with embedded animations."""
-    
+
     def __init__(self):
         self.config = None
         self.conductor = None
@@ -1087,18 +1098,18 @@ class LightBoxSystem:
         self.current_animation = 'aurora'
         self.frame_count = 0
         self.animation_thread = None
-        
+
     def initialize(self):
         """Initialize the complete system."""
         try:
             # Load configuration
             self.config = ConfigManager()
             print("✅ Configuration loaded - Platform: raspberry_pi")
-            
-            # Create conductor  
+
+            # Create conductor
             self.conductor = Conductor(self.config)
             print("✅ Conductor created")
-            
+
             # Hardware is initialized in Conductor.__init__
             print("✅ Hardware initialized")
             cols = self.config.get('hub75.cols')
@@ -1107,42 +1118,88 @@ class LightBoxSystem:
             anims = list(EMBEDDED_ANIMATIONS.keys())
             print(f"   🎬 Embedded animations: {anims}")
             return True
-                
+
         except Exception as e:
             print(f"❌ System initialization failed: {e}")
             return False
-    
+
     def start_animation_loop(self):
-        """Start the animation loop in a separate thread."""
+        """Start the optimized animation loop."""
         if self.animation_thread and self.animation_thread.is_alive():
             return
-            
+
         self.running = True
-        self.animation_thread = threading.Thread(target=self._animation_loop, daemon=True)
+
+        # Use optimized loop if available, otherwise fallback to standard
+        if OPTIMIZED_AVAILABLE:
+            target_fps = 120  # High performance target for Pi 3 B+
+            self.optimized_loop = OptimizedAnimationLoop(
+                self.conductor.matrix, target_fps
+            )
+            self.animation_thread = threading.Thread(
+                target=self._optimized_animation_loop, daemon=True
+            )
+            print(f"✅ Optimized animation loop started (target: {target_fps} FPS)")
+        else:
+            self.animation_thread = threading.Thread(
+                target=self._standard_animation_loop, daemon=True
+            )
+            print("✅ Standard animation loop started (20 FPS)")
+
         self.animation_thread.start()
-        print("✅ Animation loop started")
-    
-    def _animation_loop(self):
-        """Main animation loop."""
+
+    def _optimized_animation_loop(self):
+        """Optimized animation loop with math caching and vectorization."""
         if not self.conductor:
             print("❌ No conductor available for animation")
             return
-            
+
+        # Set animation and start optimized loop
+        self.conductor.set_animation(self.current_animation)
+
+        try:
+            # Get the animation function from conductor
+            animation_func = self.conductor.current_animation_func
+            if animation_func:
+                # Set the animation in the optimized loop
+                self.optimized_loop.set_animation(animation_func)
+                # Start the optimized loop - it will run until system stops
+                self.optimized_loop.start()
+
+                # Keep this thread alive while the loop runs
+                while self.running and self.optimized_loop.running:
+                    time.sleep(0.1)
+
+                self.optimized_loop.stop()
+            else:
+                print("❌ No animation function available")
+
+        except Exception as e:
+            print(f"Optimized animation loop error: {e}")
+            if hasattr(self, 'optimized_loop'):
+                self.optimized_loop.stop()
+
+    def _standard_animation_loop(self):
+        """Fallback standard animation loop."""
+        if not self.conductor:
+            print("❌ No conductor available for animation")
+            return
+
         # Set animation and start loop
         self.conductor.set_animation(self.current_animation)
-        
+
         try:
             while self.running:
                 # Update frame through conductor
                 self.conductor.update_frame()
-                
+
                 # Frame timing
                 time.sleep(0.05)  # 20 FPS
                 self.frame_count += 1
-                
+
         except Exception as e:
-            print(f"Animation loop error: {e}")
-    
+            print(f"Standard animation loop error: {e}")
+
     def set_animation(self, name):
         """Set current animation."""
         if name in EMBEDDED_ANIMATIONS:
@@ -1153,7 +1210,7 @@ class LightBoxSystem:
             print(f"✅ Animation set to: {name}")
             return True
         return False
-    
+
     def get_status(self):
         """Get system status."""
         return {
@@ -1163,7 +1220,7 @@ class LightBoxSystem:
             'frame_count': self.frame_count,
             'matrix_size': f"{self.config.get('hub75.cols', 64)}x{self.config.get('hub75.rows', 64)}" if self.config else "unknown"
         }
-    
+
     def stop(self):
         """Stop the system."""
         self.running = False
@@ -1853,15 +1910,15 @@ def api_stats():
 @app.route('/api/system/info')
 def api_system_info():
     """Get detailed system information."""
+    import os
     import platform
     import socket
-    import os
-    
+
     # Get Raspberry Pi model
     pi_model = "Unknown"
     try:
         if os.path.exists('/proc/device-tree/model'):
-            with open('/proc/device-tree/model', 'r') as f:
+            with open('/proc/device-tree/model') as f:
                 pi_model = f.read().strip('\0')
         elif platform.machine() in ('arm', 'armv7l', 'aarch64'):
             pi_model = f"ARM device ({platform.machine()})"
@@ -1869,7 +1926,7 @@ def api_system_info():
             pi_model = platform.system()
     except:
         pass
-    
+
     # Get network IP
     ip_address = "Unknown"
     try:
@@ -1879,21 +1936,21 @@ def api_system_info():
         s.close()
     except:
         pass
-    
+
     # Get CPU temperature
     cpu_temp = "Unknown"
     try:
         if os.path.exists("/sys/class/thermal/thermal_zone0/temp"):
-            with open("/sys/class/thermal/thermal_zone0/temp", 'r') as f:
+            with open("/sys/class/thermal/thermal_zone0/temp") as f:
                 temp_milliC = int(f.read().strip())
                 cpu_temp = f"{temp_milliC / 1000.0:.1f}°C"
     except:
         pass
-    
+
     # Get memory info
     memory_info = "Unknown"
     try:
-        with open('/proc/meminfo', 'r') as f:
+        with open('/proc/meminfo') as f:
             for line in f:
                 if line.startswith('MemTotal:'):
                     total_mb = int(line.split()[1]) / 1024
@@ -1901,11 +1958,11 @@ def api_system_info():
                     break
     except:
         pass
-    
+
     # Get network status
-    network_status = (f"Connected ({ip_address})" 
+    network_status = (f"Connected ({ip_address})"
                      if ip_address != "Unknown" else "Disconnected")
-    
+
     return jsonify({
         'pi_model': pi_model,
         'software_version': 'LightBox v2.0',
@@ -1920,17 +1977,17 @@ def api_system_info():
 def api_hardware_status():
     """Get hardware status including PWM detection and CPU isolation."""
     import os
-    
+
     # Check CPU isolation
     cpu_isolation_detected = False
     try:
-        with open('/proc/cmdline', 'r') as f:
+        with open('/proc/cmdline') as f:
             cmdline = f.read()
             if 'isolcpus=' in cmdline:
                 cpu_isolation_detected = True
     except:
         pass
-    
+
     # Check hardware PWM (GPIO4-GPIO18 jumper)
     hardware_pwm_detected = False
     try:
@@ -1939,7 +1996,7 @@ def api_hardware_status():
             hardware_pwm_detected = True
     except:
         pass
-    
+
     # Get matrix configuration
     matrix_config = {}
     if lightbox_system and lightbox_system.config:
@@ -1950,7 +2007,7 @@ def api_hardware_status():
             'pwm_bits': lightbox_system.config.get('hub75.pwm_bits', 11),
             'brightness': lightbox_system.config.get('hub75.brightness', 80)
         }
-    
+
     return jsonify({
         'hardware_pwm': hardware_pwm_detected,
         'cpu_isolation': cpu_isolation_detected,
@@ -1981,12 +2038,12 @@ def api_hardware_config():
                 }
             })
         return jsonify({'error': 'System not initialized'}), 500
-    
+
     else:  # POST
         data = request.get_json()
         if not data:
             return jsonify({'error': 'No configuration provided'}), 400
-        
+
         if lightbox_system and lightbox_system.config:
             # Update configuration
             for section, settings in data.items():
@@ -1995,10 +2052,10 @@ def api_hardware_config():
                         lightbox_system.config.set(f"{section}.{key}", value)
                 else:
                     lightbox_system.config.set(section, settings)
-            
+
             print(f"✅ Hardware configuration updated: {data}")
             return jsonify({'success': True})
-        
+
         return jsonify({'error': 'System not initialized'}), 500
 
 @app.route('/api/optimization/update', methods=['POST'])
@@ -2007,10 +2064,10 @@ def api_optimization_update():
     data = request.get_json()
     if not data or 'parameter' not in data or 'value' not in data:
         return jsonify({'error': 'Missing parameter or value'}), 400
-    
+
     parameter = data['parameter']
     value = data['value']
-    
+
     # Apply optimization parameter
     if lightbox_system and lightbox_system.config:
         # Map frontend parameter names to config keys
@@ -2023,32 +2080,32 @@ def api_optimization_update():
             'cpu-isolation': 'performance.cpu_isolation',
             'hardware-pwm': 'hub75.hardware_pwm'
         }
-        
+
         config_key = param_map.get(parameter, parameter)
         lightbox_system.config.set(config_key, value)
-        
+
         print(f"✅ Optimization parameter updated: {parameter} = {value}")
         return jsonify({
-            'success': True, 
-            'parameter': parameter, 
+            'success': True,
+            'parameter': parameter,
             'value': value
         })
-    
+
     return jsonify({'error': 'System not initialized'}), 500
 
 @app.route('/api/system/optimize', methods=['POST'])
 def api_system_optimize():
     """Apply system-level optimizations."""
-    import subprocess
     import os
-    
+    import subprocess
+
     optimizations = []
-    
+
     # Check and suggest CPU governor optimization
     try:
         gov_path = '/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor'
         if os.path.exists(gov_path):
-            result = subprocess.run(['cat', gov_path], 
+            result = subprocess.run(['cat', gov_path],
                                   capture_output=True, text=True)
             current_governor = result.stdout.strip()
             if current_governor != 'performance':
@@ -2060,10 +2117,10 @@ def api_system_optimize():
                     "CPU governor already set to performance mode")
     except:
         optimizations.append("Could not check CPU governor")
-    
+
     # Check CPU isolation
     try:
-        with open('/proc/cmdline', 'r') as f:
+        with open('/proc/cmdline') as f:
             cmdline = f.read()
             if 'isolcpus=' in cmdline:
                 optimizations.append("CPU isolation is enabled")
@@ -2071,11 +2128,11 @@ def api_system_optimize():
                 optimizations.append("CPU isolation recommended: Add 'isolcpus=3' to /boot/cmdline.txt and reboot")
     except:
         optimizations.append("Could not check CPU isolation")
-    
+
     # Check GPU memory setting
     try:
         if os.path.exists('/boot/config.txt'):
-            with open('/boot/config.txt', 'r') as f:
+            with open('/boot/config.txt') as f:
                 config = f.read()
                 if 'gpu_mem=' in config:
                     optimizations.append("GPU memory limit is configured")
@@ -2083,7 +2140,7 @@ def api_system_optimize():
                     optimizations.append("GPU memory optimization recommended: Add 'gpu_mem=16' to /boot/config.txt")
     except:
         optimizations.append("Could not check GPU memory configuration")
-    
+
     return jsonify({
         'success': True,
         'optimizations': optimizations,
@@ -2122,20 +2179,20 @@ def api_set_parameter():
         data = request.get_json()
         param = data.get('parameter')
         value = data.get('value')
-        
+
         if lightbox_system and lightbox_system.config:
             # Store parameter in config
             lightbox_system.config.config['parameters'] = lightbox_system.config.config.get('parameters', {})
             lightbox_system.config.config['parameters'][param] = value
-            
+
             # Apply brightness immediately
             if param == 'brightness' and lightbox_system.conductor and lightbox_system.conductor.matrix:
                 lightbox_system.conductor.matrix.brightness = int(value)
-            
+
             return jsonify({'success': True, 'parameter': param, 'value': value})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
-    
+
     return jsonify({'success': False, 'error': 'System not initialized'})
 
 
@@ -2145,7 +2202,7 @@ def api_power():
     try:
         data = request.get_json()
         power = data.get('power', True)
-        
+
         if lightbox_system:
             if power:
                 if not lightbox_system.running:
@@ -2154,11 +2211,11 @@ def api_power():
                 lightbox_system.running = False
                 if lightbox_system.conductor and lightbox_system.conductor.matrix:
                     lightbox_system.conductor.matrix.Clear()
-            
+
             return jsonify({'success': True, 'power': power})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
-    
+
     return jsonify({'success': False, 'error': 'System not initialized'})
 
 
@@ -2167,7 +2224,7 @@ def api_save_preset():
     """Save current settings as preset."""
     try:
         data = request.get_json()
-        
+
         if lightbox_system:
             # Save preset to config
             presets = lightbox_system.config.config.get('presets', [])
@@ -2176,11 +2233,11 @@ def api_save_preset():
             data['timestamp'] = time.time()
             presets.append(data)
             lightbox_system.config.config['presets'] = presets
-            
+
             return jsonify({'success': True, 'preset_name': preset_name})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
-    
+
     return jsonify({'success': False, 'error': 'System not initialized'})
 
 
@@ -2199,39 +2256,39 @@ def signal_handler(sig, frame):
 def main():
     """Start the complete LightBox system."""
     global lightbox_system
-    
+
     print("🚀 Starting Complete LightBox System")
     print("=" * 50)
-    
+
     # Setup signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
-    
+
     # Initialize system
     lightbox_system = LightBoxSystem()
     if not lightbox_system.initialize():
         print("❌ Failed to initialize LightBox system")
         return False
-    
+
     # Start animation loop
     lightbox_system.start_animation_loop()
-    
+
     # Configure Flask app
     CORS(app)
-    
+
     # Start web server
     print("\n🌐 Starting web server...")
     print("   📱 Web interface: http://lightbox.local:8888")
     print("   🎛️  API status: http://lightbox.local:8888/api/status")
     print("   🎬 API animations: http://lightbox.local:8888/api/animations")
     print("\n🎯 System ready! You should see lights on the HUB75 matrix!")
-    
+
     try:
         app.run(host='0.0.0.0', port=8888, debug=False, use_reloader=False)
     except Exception as e:
         print(f"❌ Web server error: {e}")
         return False
-    
+
     return True
 
 
@@ -2251,4 +2308,4 @@ if __name__ == "__main__":
         print(f"❌ Unexpected error: {e}")
         if lightbox_system:
             lightbox_system.stop()
-        sys.exit(1) 
+        sys.exit(1)

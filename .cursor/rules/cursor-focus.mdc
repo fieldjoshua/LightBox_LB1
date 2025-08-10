@@ -1,0 +1,29 @@
+---
+alwaysApply: true
+---
+For each session, the following ACTIVE Action SCOPE should be reviewed and followed. If the user wants something that falls outside of this, the old scope should be archived with date and the AI editor shall propose a new controlling Active Action scope here that controls. There shall be only one active action scope.
+
+# [Action] Scope
+## Intro
+- PROJECT: [Name]
+- GOAL: [Single sentence what this does]
+- DEFINITION OF DONE: 
+- STACK: [Exact tech being used]
+- CONSTRAINTS: [Any specific limits]
+
+## DO NOT SUGGEST
+- Switching from [current framework]
+- Adding features beyond [core function]
+- Optimizing before [it works]
+- Refactoring working code
+
+## STAY FOCUSED ON
+- [Current sprint/milestone]
+- [Specific files/components]
+
+## SPECIFIC TO-DOS
+- 1.
+
+## IF DRIFT DETECTED
+- Stop. Ask: "Should I continue with [current task] or switch to [new thing]?"
+- Never assume the switch.

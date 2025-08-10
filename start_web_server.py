@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Standalone script to start the web server with working animations."""
 
+from pathlib import Path
 import sys
 import threading
-from pathlib import Path
 
-from core.config import ConfigManager
 from core.conductor import Conductor
+from core.config import ConfigManager
 from web.app_simple import create_app, run_server
 
 # Add current directory to Python path
@@ -17,7 +17,7 @@ def main():
     """Start the web server with proper initialization."""
     print("🚀 Starting LightBox Web Server")
     print("=" * 50)
-    
+
     # Initialize configuration
     try:
         config = ConfigManager("config/settings.json")
@@ -25,12 +25,12 @@ def main():
     except Exception as e:
         print(f"❌ Configuration failed: {e}")
         return False
-    
+
     # Initialize conductor
     try:
         conductor = Conductor(config)
         print("✅ Conductor created")
-        
+
         # Initialize hardware and animations
         if conductor.initialize():
             print("✅ System initialized successfully")
@@ -43,7 +43,7 @@ def main():
     except Exception as e:
         print(f"❌ Conductor initialization failed: {e}")
         return False
-    
+
     # Start animation loop in background
     def run_animation_loop():
         """Run the animation loop in a separate thread."""
@@ -51,13 +51,13 @@ def main():
             conductor.run()
         except Exception as e:
             print(f"Animation loop error: {e}")
-    
+
     # Start animation thread
     animation_thread = threading.Thread(target=run_animation_loop,
                                        daemon=True)
     animation_thread.start()
     print("✅ Animation loop started in background")
-    
+
     # Create and run web application
     try:
         app = create_app(conductor)
@@ -69,7 +69,7 @@ def main():
                   "http://lightbox.local:8888/comprehensive")
             print("   🔧 API status: http://lightbox.local:8888/api/status")
             print()
-            
+
             # Start server
             run_server(app, host='0.0.0.0', port=8888, production=False)
         else:
@@ -78,7 +78,7 @@ def main():
     except Exception as e:
         print(f"❌ Web server error: {e}")
         return False
-    
+
     return True
 
 
@@ -94,4 +94,4 @@ if __name__ == "__main__":
         sys.exit(0)
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
-        sys.exit(1) 
+        sys.exit(1)

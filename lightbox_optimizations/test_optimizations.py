@@ -9,7 +9,6 @@ This script tests the applied optimizations and measures performance.
 import sys
 import time
 import json
-import subprocess
 
 def test_configuration():
     """Test configuration loading"""
@@ -19,7 +18,7 @@ def test_configuration():
         with open('config/settings_optimized.json', 'r') as f:
             config = json.load(f)
         
-        print(f"✅ Configuration loaded successfully")
+        print("✅ Configuration loaded successfully")
         print(f"   PWM bits: {config['hub75']['pwm_bits']}")
         print(f"   GPIO slowdown: {config['hub75']['gpio_slowdown']}")
         print(f"   Hardware PWM: {config['hub75']['hardware_pwm']}")
@@ -134,7 +133,7 @@ def run_performance_benchmark():
         loop.stop()
         controller.shutdown()
         
-        print(f"📊 Performance Results:")
+        print("📊 Performance Results:")
         print(f"   Target FPS: {stats.get('target_fps', 0):.1f}")
         print(f"   Actual FPS: {stats.get('actual_fps', 0):.1f}")
         print(f"   Frame time: {stats.get('frame_time_avg', 0):.2f}ms avg")

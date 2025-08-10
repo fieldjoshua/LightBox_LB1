@@ -4,10 +4,11 @@ Enhanced LightBox - LED Matrix Controller with HUB75 Drivers
 Uses proper hardware drivers and runs on port 8080
 """
 
-import time
-import threading
 import logging
 import math
+import threading
+import time
+
 from flask import Flask, request
 from flask_socketio import SocketIO, emit
 
@@ -27,14 +28,14 @@ except ImportError as e:
 
 class SimulatedMatrix:
     """Simulated matrix for development when hardware not available"""
-    
+
     def __init__(self, width=64, height=64):
         self.width = width
         self.height = height
         self.pixels = [(0, 0, 0)] * (width * height)
         self.brightness = 1.0
         logger.info(f"Initialized simulated matrix: {width}x{height}")
-    
+
     def set_pixel(self, x, y, r, g, b):
         """Set a pixel color"""
         if 0 <= x < self.width and 0 <= y < self.height:
@@ -44,38 +45,38 @@ class SimulatedMatrix:
                 int(g * self.brightness),
                 int(b * self.brightness)
             )
-    
+
     def clear(self):
         """Clear all pixels"""
         self.pixels = [(0, 0, 0)] * (self.width * self.height)
-    
+
     def show(self):
         """Update display (simulated)"""
         pass
-    
+
     def set_brightness(self, brightness):
         """Set brightness (0.0 to 1.0)"""
         self.brightness = max(0.0, min(1.0, brightness))
-    
+
     def initialize(self):
         """Initialize the matrix"""
         return True
 
 class Animation:
     """Base animation class"""
-    
+
     def __init__(self, name, matrix):
         self.name = name
         self.matrix = matrix
         self.frame = 0
-    
+
     def animate(self):
         """Override this method in subclasses"""
         pass
 
 class RainbowWave(Animation):
     """Rainbow wave animation"""
-    
+
     def animate(self):
         self.frame += 1
         for y in range(self.matrix.height):
@@ -84,7 +85,7 @@ class RainbowWave(Animation):
                 hue = (x + y + self.frame * 0.1) % 360
                 r, g, b = self.hsv_to_rgb(hue, 1.0, 1.0)
                 self.matrix.set_pixel(x, y, r, g, b)
-    
+
     def hsv_to_rgb(self, h, s, v):
         """Convert HSV to RGB"""
         h = h / 60
@@ -93,7 +94,7 @@ class RainbowWave(Animation):
         p = v * (1 - s)
         q = v * (1 - s * f)
         t = v * (1 - s * (1 - f))
-        
+
         if i == 0: return (v * 255, t * 255, p * 255)
         elif i == 1: return (q * 255, v * 255, p * 255)
         elif i == 2: return (p * 255, v * 255, t * 255)
@@ -103,7 +104,7 @@ class RainbowWave(Animation):
 
 class FireAnimation(Animation):
     """Fire animation"""
-    
+
     def animate(self):
         self.frame += 1
         for y in range(self.matrix.height):
@@ -118,7 +119,7 @@ class FireAnimation(Animation):
 
 class PlasmaAnimation(Animation):
     """Plasma animation"""
-    
+
     def animate(self):
         self.frame += 1
         for y in range(self.matrix.height):
@@ -127,18 +128,18 @@ class PlasmaAnimation(Animation):
                 dx = x - self.matrix.width / 2
                 dy = y - self.matrix.height / 2
                 angle = (self.frame * 0.02) % (2 * 3.14159)
-                
+
                 # Multiple sine waves for plasma effect
                 plasma = (math.sin(dx * 0.1 + self.frame * 0.01) +
                          math.sin(dy * 0.1 + self.frame * 0.01) +
                          math.sin((dx + dy) * 0.1 + self.frame * 0.01) +
                          math.sin(math.sqrt(dx*dx + dy*dy) * 0.1 + self.frame * 0.01)) / 4
-                
+
                 # Convert to color
                 hue = (plasma + 1) * 180  # 0-360
                 r, g, b = self.hsv_to_rgb(hue, 1.0, 1.0)
                 self.matrix.set_pixel(x, y, r, g, b)
-    
+
     def hsv_to_rgb(self, h, s, v):
         """Convert HSV to RGB"""
         h = h / 60
@@ -147,7 +148,7 @@ class PlasmaAnimation(Animation):
         p = v * (1 - s)
         q = v * (1 - s * f)
         t = v * (1 - s * (1 - f))
-        
+
         if i == 0: return (v * 255, t * 255, p * 255)
         elif i == 1: return (q * 255, v * 255, p * 255)
         elif i == 2: return (p * 255, v * 255, t * 255)
@@ -157,7 +158,7 @@ class PlasmaAnimation(Animation):
 
 class EnhancedLightBox:
     """Enhanced LightBox controller with hardware support"""
-    
+
     def __init__(self):
         # Initialize matrix (hardware or simulated)
         if HARDWARE_AVAILABLE:
@@ -194,7 +195,7 @@ class EnhancedLightBox:
             logger.info("🔧 Using simulated matrix (no hardware drivers)")
             self.matrix = SimulatedMatrix(64, 64)
             self.hardware_mode = False
-        
+
         # Initialize animations
         self.animations = {
             'rainbow': RainbowWave('rainbow', self.matrix),
@@ -205,15 +206,15 @@ class EnhancedLightBox:
         self.running = False
         self.brightness = 1.0
         self.speed = 1.0
-        
+
         # Web server
         self.app = Flask(__name__)
         self.socketio = SocketIO(self.app, cors_allowed_origins="*", async_mode="threading")
         self.setup_routes()
-    
+
     def setup_routes(self):
         """Setup web routes"""
-        
+
         @self.app.route('/')
         def index():
             hardware_status = "✅ Hardware" if self.hardware_mode else "🔧 Simulation"
@@ -313,12 +314,12 @@ class EnhancedLightBox:
             </body>
             </html>
             '''
-        
+
         @self.socketio.on('connect')
         def handle_connect():
             logger.info(f"Client connected: {request.sid}")
             emit('status', {'message': 'Connected'})
-        
+
         @self.socketio.on('set_animation')
         def handle_set_animation(data):
             animation = data.get('animation', 'rainbow')
@@ -326,38 +327,38 @@ class EnhancedLightBox:
                 self.current_animation = animation
                 logger.info(f"Animation changed to: {animation}")
                 emit('status', {'message': f'Animation: {animation}'})
-        
+
         @self.socketio.on('set_brightness')
         def handle_set_brightness(data):
             brightness = data.get('brightness', 1.0)
             self.brightness = max(0.0, min(1.0, brightness))
             self.matrix.set_brightness(self.brightness)
             logger.info(f"Brightness set to: {self.brightness}")
-        
+
         @self.socketio.on('set_speed')
         def handle_set_speed(data):
             speed = data.get('speed', 1.0)
             self.speed = max(0.1, min(10.0, speed))
             logger.info(f"Speed set to: {self.speed}")
-        
+
         @self.socketio.on('start')
         def handle_start():
             self.running = True
             logger.info("Animation started")
             emit('status', {'message': 'Running'})
-        
+
         @self.socketio.on('stop')
         def handle_stop():
             self.running = False
             logger.info("Animation stopped")
             emit('status', {'message': 'Stopped'})
-        
+
         @self.socketio.on('clear')
         def handle_clear():
             self.matrix.clear()
             logger.info("Matrix cleared")
             emit('status', {'message': 'Cleared'})
-    
+
     def run_animation_loop(self):
         """Run the animation loop"""
         while True:
@@ -365,29 +366,29 @@ class EnhancedLightBox:
                 animation = self.animations[self.current_animation]
                 animation.animate()
                 self.matrix.show()
-            
+
             time.sleep(0.05 / self.speed)  # 20 FPS base
-    
+
     def start(self):
         """Start the Enhanced LightBox system"""
         logger.info("Starting Enhanced LightBox...")
-        
+
         # Start animation loop in background
         animation_thread = threading.Thread(target=self.run_animation_loop, daemon=True)
         animation_thread.start()
-        
+
         # Start web server on port 8080
         logger.info("Starting web server on http://0.0.0.0:8080")
-        self.socketio.run(self.app, host='0.0.0.0', port=8080, 
+        self.socketio.run(self.app, host='0.0.0.0', port=8080,
                          allow_unsafe_werkzeug=True)
 
 def main():
     """Main entry point"""
     print("🎨 Enhanced LightBox - LED Matrix Controller")
     print("=" * 50)
-    
+
     lightbox = EnhancedLightBox()
     lightbox.start()
 
 if __name__ == "__main__":
-    main() 
+    main()

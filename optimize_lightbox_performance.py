@@ -17,11 +17,11 @@ Key fixes:
 
 import json
 import os
-import sys
-import subprocess
 import shutil
+import subprocess
+import sys
 import time
-from pathlib import Path
+
 
 # ANSI color codes for pretty output
 class Colors:
@@ -54,7 +54,7 @@ def print_info(message):
 def run_command(cmd, capture_output=True, check=True):
     """Run shell command with error handling"""
     try:
-        result = subprocess.run(cmd, shell=True, capture_output=capture_output, 
+        result = subprocess.run(cmd, shell=True, capture_output=capture_output,
                               text=True, check=check)
         return result
     except subprocess.CalledProcessError as e:
@@ -74,9 +74,9 @@ def backup_file(filepath):
 def check_pi_version():
     """Detect Raspberry Pi version"""
     try:
-        with open('/proc/cpuinfo', 'r') as f:
+        with open('/proc/cpuinfo') as f:
             cpuinfo = f.read()
-        
+
         if 'BCM2711' in cpuinfo:
             return "Pi 4/400"
         elif 'BCM2837' in cpuinfo:
@@ -96,7 +96,7 @@ def detect_hardware_pwm():
     try:
         result = run_command("gpio -g mode 4 in && gpio -g read 4", capture_output=True)
         result2 = run_command("gpio -g mode 18 in && gpio -g read 18", capture_output=True)
-        
+
         # If both pins read the same, there might be a jumper
         if result and result2:
             val4 = result.stdout.strip()
@@ -109,13 +109,13 @@ def detect_hardware_pwm():
 def optimize_hub75_config():
     """Create optimized HUB75 configuration"""
     print_header("OPTIMIZING HUB75 CONFIGURATION")
-    
+
     pi_version = check_pi_version()
     print_info(f"Detected: {pi_version}")
-    
+
     has_hardware_pwm = detect_hardware_pwm()
     print_info(f"Hardware PWM jumper: {'Detected' if has_hardware_pwm else 'Not detected'}")
-    
+
     # Optimal settings based on research and Pi version
     if "Pi 4" in pi_version or "Pi 3" in pi_version:
         # High performance settings for newer Pis
@@ -131,24 +131,24 @@ def optimize_hub75_config():
                 "chain_length": 1,
                 "parallel": 1,
                 "hardware_mapping": "adafruit-hat",
-                
+
                 # ANTI-JITTER OPTIMIZATIONS
                 "gpio_slowdown": 2,  # Reduced from 4 for better timing
                 "pwm_bits": 8,       # Reduced from 11 for higher refresh rate
                 "pwm_lsb_nanoseconds": 100,  # Faster timing
                 "pwm_dither_bits": 2,        # Compensate for lower PWM bits
                 "limit_refresh": 150,        # Higher refresh rate
-                
+
                 # HARDWARE PWM (best quality)
                 "hardware_pwm": "auto" if has_hardware_pwm else "off",
                 "disable_hardware_pulsing": not has_hardware_pwm,
-                
+
                 # PANEL OPTIMIZATIONS
                 "scan_mode": 0,
                 "row_address_type": 0,
                 "multiplexing": 0,
                 "show_refresh_rate": True,  # Monitor performance
-                
+
                 # PERFORMANCE FEATURES
                 "cpu_isolation": True
             },
@@ -190,7 +190,7 @@ def optimize_hub75_config():
     else:
         # Conservative settings for older Pis
         optimal_config = {
-            "platform": "raspberry_pi", 
+            "platform": "raspberry_pi",
             "matrix_type": "hub75",
             "target_fps": 25,  # Lower target for older hardware
             "brightness": 0.7,
@@ -205,45 +205,45 @@ def optimize_hub75_config():
                 "disable_hardware_pulsing": not has_hardware_pwm
             }
         }
-    
+
     # Save optimized configuration
     config_path = "config/settings_optimized.json"
     os.makedirs("config", exist_ok=True)
-    
+
     # Backup existing config
     if os.path.exists("config/settings.json"):
         backup_file("config/settings.json")
-    
+
     with open(config_path, 'w') as f:
         json.dump(optimal_config, f, indent=2)
-    
+
     print_success(f"Created optimized config: {config_path}")
     return optimal_config
 
 def setup_system_optimizations():
     """Apply system-level optimizations"""
     print_header("SYSTEM OPTIMIZATIONS")
-    
+
     optimizations_applied = []
-    
+
     # 1. CPU Isolation
     print_info("Setting up CPU isolation...")
     cmdline_path = "/boot/cmdline.txt"
-    
+
     if os.path.exists(cmdline_path):
         backup_file(cmdline_path)
         try:
-            with open(cmdline_path, 'r') as f:
+            with open(cmdline_path) as f:
                 cmdline = f.read().strip()
-            
+
             if 'isolcpus=3' not in cmdline:
                 cmdline += ' isolcpus=3'
-                
+
                 # Write with sudo
                 temp_file = '/tmp/cmdline_new.txt'
                 with open(temp_file, 'w') as f:
                     f.write(cmdline)
-                
+
                 result = run_command(f"sudo cp {temp_file} {cmdline_path}")
                 if result and result.returncode == 0:
                     print_success("Added CPU isolation (isolcpus=3)")
@@ -253,10 +253,10 @@ def setup_system_optimizations():
             else:
                 print_success("CPU isolation already configured")
                 optimizations_applied.append("CPU isolation (existing)")
-                
+
         except Exception as e:
             print_error(f"Error configuring CPU isolation: {e}")
-    
+
     # 2. Audio Module Blacklisting
     print_info("Blacklisting conflicting audio modules...")
     blacklist_path = "/etc/modprobe.d/blacklist-rgb-matrix.conf"
@@ -266,12 +266,12 @@ blacklist snd_pcm
 blacklist snd_timer
 blacklist snd
 """
-    
+
     try:
         temp_file = '/tmp/blacklist_rgb.conf'
         with open(temp_file, 'w') as f:
             f.write(blacklist_content)
-        
+
         result = run_command(f"sudo cp {temp_file} {blacklist_path}")
         if result and result.returncode == 0:
             print_success("Audio modules blacklisted")
@@ -280,33 +280,33 @@ blacklist snd
             print_error("Failed to create blacklist - run as sudo")
     except Exception as e:
         print_error(f"Error creating blacklist: {e}")
-    
+
     # 3. Boot Config Optimizations
     print_info("Optimizing boot configuration...")
     config_path = "/boot/config.txt"
-    
+
     if os.path.exists(config_path):
         backup_file(config_path)
         try:
-            with open(config_path, 'r') as f:
+            with open(config_path) as f:
                 config_content = f.read()
-            
+
             additions = []
-            
+
             if 'dtparam=audio=off' not in config_content:
                 additions.append('dtparam=audio=off')
-            
+
             if 'gpu_mem=16' not in config_content:
                 additions.append('gpu_mem=16')
-            
+
             if additions:
                 config_content += '\n\n# LightBox optimizations\n'
                 config_content += '\n'.join(additions) + '\n'
-                
+
                 temp_file = '/tmp/config_new.txt'
                 with open(temp_file, 'w') as f:
                     f.write(config_content)
-                
+
                 result = run_command(f"sudo cp {temp_file} {config_path}")
                 if result and result.returncode == 0:
                     print_success("Boot config optimized")
@@ -315,17 +315,17 @@ blacklist snd
                     print_error("Failed to update config.txt - run as sudo")
             else:
                 print_success("Boot config already optimized")
-                
+
         except Exception as e:
             print_error(f"Error updating boot config: {e}")
-    
+
     # 4. Disable Unnecessary Services
     print_info("Disabling unnecessary services...")
     services_to_disable = [
-        'bluetooth', 'hciuart', 'cups', 'cups-browsed', 
+        'bluetooth', 'hciuart', 'cups', 'cups-browsed',
         'avahi-daemon', 'triggerhappy'
     ]
-    
+
     for service in services_to_disable:
         result = run_command(f"sudo systemctl is-enabled {service}", check=False)
         if result and result.returncode == 0:
@@ -333,13 +333,13 @@ blacklist snd
             if disable_result and disable_result.returncode == 0:
                 print_success(f"Disabled {service}")
                 optimizations_applied.append(f"Disabled {service}")
-    
+
     return optimizations_applied
 
 def create_optimized_matrix_controller():
     """Create improved matrix controller with double buffering"""
     print_header("CREATING OPTIMIZED MATRIX CONTROLLER")
-    
+
     controller_code = '''"""
 Optimized Matrix Controller with Double Buffering
 ================================================
@@ -510,20 +510,20 @@ class OptimizedMatrixController:
             self.clear()
         logger.info("Matrix controller shutdown")
 '''
-    
+
     # Save the optimized controller
     controller_path = "core/optimized_matrix_controller.py"
     os.makedirs("core", exist_ok=True)
-    
+
     with open(controller_path, 'w') as f:
         f.write(controller_code)
-    
+
     print_success(f"Created optimized matrix controller: {controller_path}")
-    
+
 def create_improved_animation_loop():
     """Create animation loop with proper timing"""
     print_header("CREATING IMPROVED ANIMATION LOOP")
-    
+
     loop_code = '''"""
 Improved Animation Loop
 ======================
@@ -665,18 +665,18 @@ class OptimizedAnimationLoop:
             'frame_count': self.frame_count
         }
 '''
-    
+
     loop_path = "core/optimized_animation_loop.py"
-    
+
     with open(loop_path, 'w') as f:
         f.write(loop_code)
-    
+
     print_success(f"Created improved animation loop: {loop_path}")
 
 def create_test_script():
     """Create test script to verify optimizations"""
     print_header("CREATING OPTIMIZATION TEST SCRIPT")
-    
+
     test_code = '''#!/usr/bin/env python3
 """
 LightBox Optimization Test Script
@@ -873,12 +873,12 @@ def main():
 if __name__ == "__main__":
     main()
 '''
-    
+
     test_path = "test_optimizations.py"
-    
+
     with open(test_path, 'w') as f:
         f.write(test_code)
-    
+
     os.chmod(test_path, 0o755)  # Make executable
     print_success(f"Created test script: {test_path}")
 
@@ -889,28 +889,28 @@ def main():
     print("==========================================")
     print("Fixing jittery animations and GUI controls")
     print(f"{Colors.END}")
-    
+
     if os.geteuid() != 0:
         print_warning("Some optimizations require sudo privileges")
         print_info("Run with: sudo python3 optimize_lightbox_performance.py")
-    
+
     try:
         # Step 1: Create optimized configuration
         config = optimize_hub75_config()
-        
+
         # Step 2: Apply system optimizations
         system_opts = setup_system_optimizations()
-        
+
         # Step 3: Create optimized controllers
         create_optimized_matrix_controller()
         create_improved_animation_loop()
-        
+
         # Step 4: Create test script
         create_test_script()
-        
+
         # Summary
         print_header("OPTIMIZATION COMPLETE")
-        
+
         print("📋 Applied optimizations:")
         optimizations = [
             "✅ Optimized HUB75 configuration (reduced PWM bits, GPIO timing)",
@@ -919,33 +919,33 @@ def main():
             "✅ Fixed animation loop timing (removed fixed 20 FPS limit)",
             "✅ Added hardware PWM detection and configuration",
         ] + [f"✅ {opt}" for opt in system_opts]
-        
+
         for opt in optimizations:
             print(f"   {opt}")
-        
+
         print(f"\n{Colors.YELLOW}{Colors.BOLD}⚠️  REBOOT REQUIRED{Colors.END}")
         print("Some optimizations require a reboot to take effect:")
         print("   • CPU isolation")
-        print("   • Audio module blacklisting") 
+        print("   • Audio module blacklisting")
         print("   • Boot configuration changes")
-        
+
         print(f"\n{Colors.GREEN}{Colors.BOLD}🧪 NEXT STEPS:{Colors.END}")
         print("1. Reboot your Raspberry Pi")
         print("2. Run the test script: python3 test_optimizations.py")
         print("3. Use the optimized config: config/settings_optimized.json")
         print("4. Update your main script to use OptimizedMatrixController")
-        
+
         print(f"\n{Colors.CYAN}📚 For your reference:{Colors.END}")
         print("• Original config backed up with timestamp")
         print("• Optimized settings prioritize smoothness over color depth")
         print("• Hardware PWM jumper (GPIO4-GPIO18) recommended for best quality")
-        
+
         return True
-        
+
     except Exception as e:
         print_error(f"Optimization failed: {e}")
         return False
 
 if __name__ == "__main__":
     success = main()
-    sys.exit(0 if success else 1) 
+    sys.exit(0 if success else 1)

@@ -4,15 +4,15 @@ This adapter lets legacy code that expects the original ``MatrixDriver``
 interface work with the new high-level controller without refactoring.
 """
 
-# flake8: noqa: E501  # allow a few intentional long lines for readability
+# allow a few intentional long lines for readability
 
 from __future__ import annotations
 
 import logging
-from typing import List, Tuple, Union
 
 from core.hardware_config import HardwareConfig
 from core.matrix_controller import MatrixController
+
 from .matrix_driver import MatrixDriver
 
 logger = logging.getLogger(__name__)
@@ -36,11 +36,11 @@ class HUB75ControllerDriver(MatrixDriver):
     # MatrixDriver interface implementation
     # ------------------------------------------------------------------
 
-    def initialize(self) -> bool:  # noqa: D401 – imperative verb OK
+    def initialize(self) -> bool:
         """Hardware is already initialised in MatrixController constructor."""
         return True
 
-    def _apply_brightness(self, rgb: Tuple[int, int, int]) -> Tuple[int, int, int]:
+    def _apply_brightness(self, rgb: tuple[int, int, int]) -> tuple[int, int, int]:
         if self._brightness >= 0.999:
             return rgb
         r, g, b = rgb
@@ -49,7 +49,7 @@ class HUB75ControllerDriver(MatrixDriver):
 
     def update(
         self,
-        frame_buffer: Union[List[Tuple[int, int, int]], bytearray],
+        frame_buffer: list[tuple[int, int, int]] | bytearray,
     ) -> None:
         """Copy an RGB frame buffer to the hardware canvas."""
         canvas = self.controller.create_frame()
@@ -103,4 +103,4 @@ class HUB75ControllerDriver(MatrixDriver):
         self._brightness = max(0.0, min(1.0, brightness))
 
     def cleanup(self) -> None:
-        self.controller.cleanup() 
+        self.controller.cleanup()

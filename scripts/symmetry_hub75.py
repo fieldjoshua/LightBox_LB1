@@ -10,9 +10,7 @@ This animation is optimized for HUB75 LED matrices with the following features:
 """
 
 import math
-import random
-import time
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 
 # Parameter defaults that can be overridden via the config
 DEFAULT_PARAMS = {

@@ -4,7 +4,6 @@ Hardware detection utilities for Raspberry Pi LED matrix.
 Provides functions for detecting hardware PWM and CPU isolation.
 """
 
-import os
 import time
 import logging
 import subprocess

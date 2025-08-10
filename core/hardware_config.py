@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 """Hardware configuration dataclass for HUB75 LED matrices.
 
@@ -15,9 +14,10 @@ Default values target a single 64 × 64 panel plugged into an Adafruit RGB
 Matrix HAT running on a Raspberry Pi 3B+.
 """
 
-import logging
+from __future__ import annotations
 from dataclasses import dataclass
-from typing import Any, Dict, TYPE_CHECKING
+import logging
+from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
 
@@ -61,8 +61,8 @@ class HardwareConfig:
     @classmethod
     def from_config(
         cls,
-        cfg_mgr: "ConfigManager | Dict[str, Any]",  # noqa: F821 – forward ref
-    ) -> "HardwareConfig":
+        cfg_mgr: ConfigManager | dict[str, Any],
+    ) -> HardwareConfig:
         """Create a :class:`HardwareConfig` from the project configuration.
 
         Parameters
@@ -73,7 +73,7 @@ class HardwareConfig:
         """
         if hasattr(cfg_mgr, "get"):
             # Assume ConfigManager-like
-            hub_cfg: Dict[str, Any] = cfg_mgr.get(  # type: ignore[arg-type]
+            hub_cfg: dict[str, Any] = cfg_mgr.get(  # type: ignore[arg-type]
                 "hub75",
                 {},
             )
@@ -122,4 +122,4 @@ class HardwareConfig:
     @property
     def resolution(self) -> tuple[int, int]:
         """Return ``(cols, rows)`` for quick access."""
-        return self.cols, self.rows 
+        return self.cols, self.rows

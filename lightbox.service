@@ -1,21 +1,31 @@
 [Unit]
-Description=LightBox LED Matrix Controller
-After=network.target
+Description=LightBox Runner
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 Type=simple
-User=root
-WorkingDirectory=/home/fieldjoshua/LightBox
-ExecStart=/home/fieldjoshua/LightBox/venv/bin/python3 /home/fieldjoshua/LightBox/CosmicLED.py
-Restart=on-failure
-RestartSec=10
-
-# Environment
-Environment="PYTHONUNBUFFERED=1"
-
-# Logging
+User=joshuafield
+WorkingDirectory=/home/joshuafield/LightBox2.0
+Environment=PYTHONPATH=/home/joshuafield/LightBox2.0
+Environment=PATH=/home/joshuafield/LightBox2.0/venv/bin:/usr/bin:/bin
+ExecStartPre=-/usr/bin/pkill -f /home/joshuafield/LightBox2.0/run_hw.py
+ExecStartPre=-/usr/bin/fuser -k 8888/tcp
+ExecStartPre=-/usr/bin/fuser -k 8899/tcp
+ExecStart=/home/joshuafield/LightBox2.0/venv/bin/python3 /home/joshuafield/LightBox2.0/run_hw.py
+Restart=always
+RestartSec=2
+KillMode=control-group
+TimeoutStopSec=10
+MemoryMax=300M
+TasksMax=100
 StandardOutput=journal
 StandardError=journal
+AmbientCapabilities=CAP_SYS_NICE
+CapabilityBoundingSet=CAP_SYS_NICE
+LimitRTPRIO=99
 
 [Install]
 WantedBy=multi-user.target
+
+; Legacy content below intentionally removed to avoid conflicting unit definitions
