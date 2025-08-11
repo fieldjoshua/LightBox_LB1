@@ -70,7 +70,6 @@ class HUB75Driver(MatrixDriver):
             options.cols = self.hub_config.get("cols", 64)
             options.chain_length = self.hub_config.get("chain_length", 1)
             options.parallel = self.hub_config.get("parallel", 1)
-            options.hardware_mapping = 'adafruit-hat'  # Adafruit HAT/Bonnet
             
             # Critical performance settings from optimization guide
             # -----------------------------------------------------
@@ -90,6 +89,14 @@ class HUB75Driver(MatrixDriver):
             # - Higher values: More stable but slower refresh
             options.pwm_lsb_nanoseconds = self.hub_config.get("pwm_lsb_nanoseconds", 130)
             
+            # pwm_dither_bits: Time-dither lower bits for smoother gradients
+            # - 0: No dithering (default)
+            # - 1-2: Dither lower bits across frames for better color depth
+            pwm_dither = self.hub_config.get("pwm_dither_bits", 0)
+            if pwm_dither > 0:
+                options.pwm_dither_bits = pwm_dither
+                logger.info(f"PWM dithering enabled: {pwm_dither} bits")
+            
             # Set brightness (0-100%)
             options.brightness = int(self.config.get("brightness", 0.8) * 100)
             
@@ -101,12 +108,25 @@ class HUB75Driver(MatrixDriver):
             # Hardware PWM eliminates flicker by using hardware pulse generation
             # This requires physically soldering a jumper between GPIO4 and GPIO18
             # Without this jumper, software PWM is used which can cause flickering lines
-            if self._detect_hardware_pwm():
+            hardware_pwm_setting = self.hub_config.get("hardware_pwm", "auto")
+            
+            if hardware_pwm_setting == "on":
                 options.disable_hardware_pulsing = False
-                logger.info("Hardware PWM enabled - eliminates flicker!")
-            else:
+                options.hardware_mapping = 'adafruit-hat-pwm'
+                logger.info("Hardware PWM forced ON - using adafruit-hat-pwm mapping")
+            elif hardware_pwm_setting == "off":
                 options.disable_hardware_pulsing = True
-                logger.warning("Hardware PWM not detected - consider soldering GPIO4-GPIO18 jumper")
+                options.hardware_mapping = 'adafruit-hat'
+                logger.info("Hardware PWM forced OFF - using standard adafruit-hat mapping")
+            else:  # auto
+                if self._detect_hardware_pwm():
+                    options.disable_hardware_pulsing = False
+                    options.hardware_mapping = 'adafruit-hat-pwm'
+                    logger.info("Hardware PWM auto-detected - eliminates flicker!")
+                else:
+                    options.disable_hardware_pulsing = True
+                    options.hardware_mapping = 'adafruit-hat'
+                    logger.warning("Hardware PWM not detected - consider soldering GPIO4-GPIO18 jumper")
             
             # Frame rate limiting for stability
             # -----------------------------------------------------

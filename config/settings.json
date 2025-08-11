@@ -10,7 +10,7 @@
     "cols": 64,
     "chain_length": 1,
     "parallel": 1,
-    "hardware_mapping": "adafruit-hat",
+    "hardware_mapping": "adafruit-hat-pwm",
     "gpio_slowdown": 4,
     "pwm_bits": 11,
     "pwm_lsb_nanoseconds": 130,
@@ -19,7 +19,9 @@
     "row_address_type": 0,
     "multiplexing": 0,
     "disable_hardware_pulsing": false,
-    "show_refresh_rate": false
+    "show_refresh_rate": true,
+    "pwm_dither_bits": 1,
+    "hardware_pwm": "auto"
   },
   
   "ws2811": {
@@ -39,9 +41,11 @@
   
   "performance": {
     "stats_interval": 10,
-    "buffer_pool_size": 3,
-    "show_refresh_rate": false,
-    "cpu_isolation": false
+    "buffer_pool_size": 4,
+    "show_refresh_rate": true,
+    "cpu_isolation": true,
+    "use_optimized_loop": true,
+    "frame_pool_enabled": true
   },
   
   "hardware": {

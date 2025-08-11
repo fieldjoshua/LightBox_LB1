@@ -210,8 +210,11 @@ class Conductor:
         self.running = True
         logger.info("Starting animation loop")
         
-        # Get frame buffer from pool
-        pixels = [(0, 0, 0)] * self.matrix.num_pixels
+        # Use frame buffer pool if enabled
+        if self.config.get("performance.frame_pool_enabled", True):
+            pixels = self._frame_pool.acquire()
+        else:
+            pixels = [(0, 0, 0)] * self.matrix.num_pixels
         
         while self.running:
             try:
@@ -219,12 +222,33 @@ class Conductor:
                 self.performance.frame_start()
                 
                 if not self._paused and self.current_animation:
-                    # Run animation
-                    self.current_animation.animate(
-                        pixels,
-                        self.config,
-                        self.current_animation.frame_count
-                    )
+                    # Convert bytearray to list if needed by animation
+                    if isinstance(pixels, bytearray):
+                        # Create a temporary list view for animations that expect list format
+                        pixel_list = []
+                        for i in range(0, len(pixels), 3):
+                            pixel_list.append((pixels[i], pixels[i+1], pixels[i+2]))
+                        
+                        # Run animation with list format
+                        self.current_animation.animate(
+                            pixel_list,
+                            self.config,
+                            self.current_animation.frame_count
+                        )
+                        
+                        # Copy back to bytearray
+                        for i, (r, g, b) in enumerate(pixel_list):
+                            pixels[i*3] = r
+                            pixels[i*3+1] = g
+                            pixels[i*3+2] = b
+                    else:
+                        # Run animation with standard list format
+                        self.current_animation.animate(
+                            pixels,
+                            self.config,
+                            self.current_animation.frame_count
+                        )
+                    
                     self.current_animation.frame_count += 1
                     
                     # Update matrix
@@ -284,7 +308,7 @@ class Conductor:
         
         logger.info("Conductor stopped")
     
-    def _signal_handler(self, signum, _frame):
+    def _signal_handler(self, signum, frame):
         """Handle shutdown signals."""
         logger.info(f"Received signal {signum}")
         self.stop()
@@ -344,10 +368,27 @@ class Conductor:
     def clear_caches(self):
         """Clear all performance caches."""
         # Clear config caches
-        self.config._color_cache.clear()
+        if hasattr(self.config, '_color_cache'):
+            self.config._color_cache.clear()
         
         # Clear any other caches
         logger.info("Cleared all caches")
+    
+    def set_animation_param(self, param: str, value: Any) -> bool:
+        """Set a parameter for the current animation."""
+        if not self.current_animation:
+            logger.error("No animation currently active")
+            return False
+        
+        # Update config
+        self.config.set(f"animations.{param}", value)
+        
+        # Update animation params if it has them
+        if hasattr(self.current_animation, 'params'):
+            self.current_animation.params[param] = value
+        
+        logger.info(f"Set animation param: {param} = {value}")
+        return True
     
     def emergency_stop(self):
         """Emergency stop - immediately halt all operations."""
