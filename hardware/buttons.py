@@ -63,6 +63,18 @@ class ButtonController:
         """Stop button monitoring"""
         self.running = False
         GPIO.cleanup()
+
+    # Backwards-compatible cleanup alias
+    def cleanup(self):  # noqa: D401 – simple alias verb
+        """Alias to stop() for external cleanup calls."""
+        try:
+            self.stop()
+        except Exception:
+            # Ensure GPIO state does not raise during shutdown
+            try:
+                GPIO.cleanup()
+            except Exception:
+                pass
         
     def monitor_buttons(self):
         """Main button monitoring loop with debouncing"""

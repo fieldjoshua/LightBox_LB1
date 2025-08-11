@@ -236,11 +236,33 @@ class Conductor:
                             self.current_animation.frame_count
                         )
                         
-                        # Copy back to bytearray
+                        # Copy back to bytearray (clamp and cast to 0..255 ints)
                         for i, (r, g, b) in enumerate(pixel_list):
-                            pixels[i*3] = r
-                            pixels[i*3+1] = g
-                            pixels[i*3+2] = b
+                            # Handle animations that output floats or out-of-range values
+                            if isinstance(r, float):
+                                r = int(r)
+                            if isinstance(g, float):
+                                g = int(g)
+                            if isinstance(b, float):
+                                b = int(b)
+                            if r < 0:
+                                r = 0
+                            elif r > 255:
+                                r = 255
+                            if g < 0:
+                                g = 0
+                            elif g > 255:
+                                g = 255
+                            if b < 0:
+                                b = 0
+                            elif b > 255:
+                                b = 255
+                            base = i * 3
+                            if base + 2 >= len(pixels):
+                                break
+                            pixels[base] = r
+                            pixels[base + 1] = g
+                            pixels[base + 2] = b
                     else:
                         # Run animation with standard list format
                         self.current_animation.animate(
@@ -424,10 +446,10 @@ def main():
     if conductor.config.get("enable_web", True):
         try:
             try:
-                from ..web.app import create_app, run_server
+                from ..web.app_simple import create_app, run_server
             except ImportError:
                 # Fallback for when running as main script
-                from web.app import create_app, run_server
+                from web.app_simple import create_app, run_server
             app = create_app(conductor)
             
             # Run web server in background thread
