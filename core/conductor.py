@@ -48,7 +48,7 @@ class AnimationProgram:
 class Conductor:
     """Unified animation controller with performance optimizations."""
     
-    def __init__(self, config_path: str = "settings.json"):
+    def __init__(self, config_path: str = "config/settings.json"):
         # Core components
         self.config = ConfigManager(config_path)
         self.performance = PerformanceMonitor(
