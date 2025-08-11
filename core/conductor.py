@@ -7,7 +7,6 @@ import time
 import threading
 import signal
 import sys
-import os
 import importlib.util
 import logging
 from pathlib import Path
@@ -22,8 +21,6 @@ try:
     from ..hardware.hardware_manager import HardwareManager
 except ImportError:
     # Fallback for when running as main script
-    import sys
-    from pathlib import Path
     sys.path.append(str(Path(__file__).parent.parent))
     from drivers.matrix_driver import create_matrix_driver
     from hardware.hardware_manager import HardwareManager
@@ -383,10 +380,10 @@ def main():
     if conductor.config.get("enable_web", True):
         try:
             try:
-                from ..web.app import create_app, run_server
+                from ..web.app_simple import create_app, run_server
             except ImportError:
                 # Fallback for when running as main script
-                from web.app import create_app, run_server
+                from web.app_simple import create_app, run_server
             app = create_app(conductor)
             
             # Run web server in background thread

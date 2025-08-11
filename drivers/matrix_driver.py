@@ -210,25 +210,22 @@ def create_matrix_driver(config) -> MatrixDriver:
         return SimulatedMatrixDriver(config)
     
     if matrix_type == "hub75":
-        # Prefer the newer controller-based driver; fall back to the legacy
-        # implementation if the new adapter cannot be imported (e.g. missing
-        # dependencies on non-Pi hosts).
+        # Prefer the optimized HUB75Driver (double-buffered with SwapOnVSync).
+        # Fall back to the controller-adapter or simulation as needed.
         try:
-            from .hub75_controller_driver import HUB75ControllerDriver  # noqa: E501
-
-            return HUB75ControllerDriver(config)
-        except ImportError as e:
+            from .hub75_driver import HUB75Driver
+            return HUB75Driver(config)
+        except ImportError as e_primary:
             logger.warning(
-                "New HUB75ControllerDriver unavailable (%s). "
-                "Falling back to legacy HUB75Driver.",
-                e,
-            )  # noqa: E501
+                "HUB75Driver unavailable (%s). Trying HUB75ControllerDriver...",
+                e_primary,
+            )
             try:
-                from .hub75_driver import HUB75Driver
-                return HUB75Driver(config)
-            except ImportError as e2:
+                from .hub75_controller_driver import HUB75ControllerDriver  # noqa: E501
+                return HUB75ControllerDriver(config)
+            except ImportError as e_secondary:
                 logger.error(
-                    "Failed to import legacy HUB75 driver: %s", e2
+                    "HUB75 controller-based driver unavailable: %s", e_secondary
                 )
                 logger.warning("Falling back to simulated driver")
                 return SimulatedMatrixDriver(config)
