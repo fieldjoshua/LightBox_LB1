@@ -1,56 +1,72 @@
 {
-  "platform": "raspberry_pi",
+  "brightness": 0.8,
+  "speed": 1.0,
+  "color_palette": "rainbow",
+  "animation_program": "aurora_hub75",
   "matrix_type": "hub75",
   "target_fps": 30,
-  "brightness": 0.8,
-  "animation_program": "cosmic",
-  
-  "hub75": {
-    "rows": 64,
-    "cols": 64,
-    "chain_length": 1,
-    "parallel": 1,
-    "hardware_mapping": "adafruit-hat",
-    "gpio_slowdown": 4,
-    "pwm_bits": 11,
-    "pwm_lsb_nanoseconds": 130,
-    "limit_refresh": 0,
-    "scan_mode": 0,
-    "row_address_type": 0,
-    "multiplexing": 0,
-    "disable_hardware_pulsing": false,
-    "show_refresh_rate": false
-  },
-  
+  "enable_metrics": true,
+  "enable_caching": true,
   "ws2811": {
     "num_pixels": 100,
+    "width": 10,
+    "height": 10,
+    "serpentine": true,
+    "data_pin": "D12",
+    "gamma": 2.2,
     "pin": 12,
     "freq_hz": 800000,
     "dma": 10,
     "invert": false,
     "channel": 0
   },
-  
+  "hub75": {
+    "rows": 64,
+    "cols": 64,
+    "chain_length": 1,
+    "parallel": 1,
+    "pwm_bits": 11,
+    "pwm_lsb_nanoseconds": 130,
+    "gpio_slowdown": 4,
+    "hardware_pwm": "auto",
+    "cpu_isolation": true,
+    "limit_refresh": 120,
+    "scan_mode": 0,
+    "row_address_type": 0,
+    "multiplexing": 0,
+    "hardware_mapping": "adafruit-hat",
+    "disable_hardware_pulsing": false,
+    "show_refresh_rate": true,
+    "pwm_dither_bits": 1
+  },
+  "performance": {
+    "enable_caching": true,
+    "cache_size": 1000,
+    "buffer_pool_size": 4,
+    "stats_interval": 10,
+    "enable_profiling": true,
+    "show_refresh_rate": true,
+    "cpu_isolation": true,
+    "use_optimized_loop": true,
+    "frame_pool_enabled": true
+  },
+  "platform": "raspberry_pi",
   "web": {
     "host": "0.0.0.0",
-    "port": 5000,
+    "port": 8899,
     "debug": false
   },
-  
-  "performance": {
-    "stats_interval": 10,
-    "buffer_pool_size": 3,
-    "show_refresh_rate": false,
-    "cpu_isolation": false
-  },
-  
   "hardware": {
     "buttons_enabled": true,
     "oled_enabled": true,
-    "button_pins": [17, 27, 22, 23],
+    "button_pins": [
+      17,
+      27,
+      22,
+      23
+    ],
     "oled_address": "0x3C"
   },
-  
   "animations": {
     "speed": 1.0,
     "intensity": 1.0,
@@ -61,66 +77,213 @@
     "color_intensity": 1.0,
     "time_scale": 0.05
   },
-  
   "palettes": {
     "current": "rainbow",
     "rainbow": [
-      [255, 0, 0],
-      [255, 127, 0],
-      [255, 255, 0],
-      [0, 255, 0],
-      [0, 0, 255],
-      [75, 0, 130],
-      [148, 0, 211]
+      [
+        255,
+        0,
+        0
+      ],
+      [
+        255,
+        127,
+        0
+      ],
+      [
+        255,
+        255,
+        0
+      ],
+      [
+        0,
+        255,
+        0
+      ],
+      [
+        0,
+        0,
+        255
+      ],
+      [
+        75,
+        0,
+        130
+      ],
+      [
+        148,
+        0,
+        211
+      ]
     ],
     "fire": [
-      [0, 0, 0],
-      [128, 0, 0],
-      [255, 0, 0],
-      [255, 128, 0],
-      [255, 255, 0],
-      [255, 255, 128]
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        128,
+        0,
+        0
+      ],
+      [
+        255,
+        0,
+        0
+      ],
+      [
+        255,
+        128,
+        0
+      ],
+      [
+        255,
+        255,
+        0
+      ],
+      [
+        255,
+        255,
+        128
+      ]
     ],
     "ocean": [
-      [0, 0, 32],
-      [0, 32, 64],
-      [0, 64, 128],
-      [0, 128, 192],
-      [64, 192, 255],
-      [128, 255, 255]
+      [
+        0,
+        0,
+        32
+      ],
+      [
+        0,
+        32,
+        64
+      ],
+      [
+        0,
+        64,
+        128
+      ],
+      [
+        0,
+        128,
+        192
+      ],
+      [
+        64,
+        192,
+        255
+      ],
+      [
+        128,
+        255,
+        255
+      ]
     ],
     "forest": [
-      [0, 32, 0],
-      [0, 64, 0],
-      [0, 128, 0],
-      [64, 192, 0],
-      [128, 255, 0],
-      [192, 255, 64]
+      [
+        0,
+        32,
+        0
+      ],
+      [
+        0,
+        64,
+        0
+      ],
+      [
+        0,
+        128,
+        0
+      ],
+      [
+        64,
+        192,
+        0
+      ],
+      [
+        128,
+        255,
+        0
+      ],
+      [
+        192,
+        255,
+        64
+      ]
     ],
     "sunset": [
-      [64, 0, 128],
-      [128, 0, 64],
-      [255, 0, 64],
-      [255, 64, 0],
-      [255, 128, 0],
-      [255, 192, 64]
+      [
+        64,
+        0,
+        128
+      ],
+      [
+        128,
+        0,
+        64
+      ],
+      [
+        255,
+        0,
+        64
+      ],
+      [
+        255,
+        64,
+        0
+      ],
+      [
+        255,
+        128,
+        0
+      ],
+      [
+        255,
+        192,
+        64
+      ]
     ],
     "monochrome": [
-      [0, 0, 0],
-      [32, 32, 32],
-      [64, 64, 64],
-      [128, 128, 128],
-      [192, 192, 192],
-      [255, 255, 255]
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        32,
+        32,
+        32
+      ],
+      [
+        64,
+        64,
+        64
+      ],
+      [
+        128,
+        128,
+        128
+      ],
+      [
+        192,
+        192,
+        192
+      ],
+      [
+        255,
+        255,
+        255
+      ]
     ]
   },
-  
   "user_presets": {},
-  
   "system": {
     "log_level": "INFO",
     "log_file": "lightbox.log",
     "auto_save_presets": true,
     "emergency_stop_enabled": true
-  }
-} 
+  },
+  "simulation_mode": true,
+  "platform_optimized": true
+}

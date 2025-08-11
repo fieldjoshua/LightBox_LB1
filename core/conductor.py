@@ -207,8 +207,13 @@ class Conductor:
         self.running = True
         logger.info("Starting animation loop")
         
-        # Get frame buffer from pool
-        pixels = [(0, 0, 0)] * self.matrix.num_pixels
+        # Use frame buffer pool if enabled; pooled buffer is a bytearray of RGB triples.
+        use_pool = self.config.get("performance.frame_pool_enabled", True)
+        pixels: Any
+        if use_pool:
+            pixels = self._frame_pool.acquire()
+        else:
+            pixels = [(0, 0, 0)] * self.matrix.num_pixels
         
         while self.running:
             try:
@@ -216,12 +221,32 @@ class Conductor:
                 self.performance.frame_start()
                 
                 if not self._paused and self.current_animation:
-                    # Run animation
-                    self.current_animation.animate(
-                        pixels,
-                        self.config,
-                        self.current_animation.frame_count
-                    )
+                    if isinstance(pixels, bytearray):
+                        # Use a single shared list buffer to avoid reallocation each frame.
+                        if not hasattr(self, "_tuple_buffer") or len(self._tuple_buffer) != self.matrix.num_pixels:
+                            self._tuple_buffer = [(0, 0, 0)] * self.matrix.num_pixels
+                        tuple_buf = self._tuple_buffer
+                        self.current_animation.animate(
+                            tuple_buf,
+                            self.config,
+                            self.current_animation.frame_count,
+                        )
+                        # Pack back into bytearray
+                        bi = 0
+                        for (r, g, b) in tuple_buf:
+                            if bi + 2 >= len(pixels):
+                                break
+                            pixels[bi] = r
+                            pixels[bi + 1] = g
+                            pixels[bi + 2] = b
+                            bi += 3
+                    else:
+                        self.current_animation.animate(
+                            pixels,
+                            self.config,
+                            self.current_animation.frame_count,
+                        )
+                    
                     self.current_animation.frame_count += 1
                     
                     # Update matrix
@@ -242,6 +267,10 @@ class Conductor:
             except Exception as e:
                 logger.error(f"Animation error: {e}")
                 time.sleep(0.1)  # Prevent tight error loop
+        
+        # Return frame buffer to pool if used
+        if use_pool and isinstance(pixels, bytearray):
+            self._frame_pool.release(pixels)
         
         logger.info("Animation loop stopped")
     
@@ -281,7 +310,7 @@ class Conductor:
         
         logger.info("Conductor stopped")
     
-    def _signal_handler(self, signum, _frame):
+    def _signal_handler(self, signum, frame):
         """Handle shutdown signals."""
         logger.info(f"Received signal {signum}")
         self.stop()
@@ -326,6 +355,30 @@ class Conductor:
     def load_preset(self, name: str) -> bool:
         """Load settings from preset."""
         return self.config.load_preset(name)
+    
+    def set_animation_param(self, param: str, value: Any) -> bool:
+        """Set a parameter for the current animation.
+        
+        Args:
+            param: Parameter name
+            value: Parameter value
+            
+        Returns:
+            bool: True if parameter was set successfully
+        """
+        if not self.current_animation:
+            logger.error("No animation currently active")
+            return False
+        
+        # Store parameter in config for animations to access
+        self.config.set(f"animations.{param}", value)
+        
+        # Also update animation's params if it has them
+        if hasattr(self.current_animation, 'params'):
+            self.current_animation.params[param] = value
+        
+        logger.info(f"Set animation parameter: {param} = {value}")
+        return True
 
 
 
@@ -340,8 +393,13 @@ class Conductor:
     
     def clear_caches(self):
         """Clear all performance caches."""
-        # Clear config caches
-        self.config._color_cache.clear()
+        # Clear config caches if they exist
+        if hasattr(self.config, '_color_cache'):
+            self.config._color_cache.clear()
+        
+        # Clear HSV cache (using LRU cache)
+        if hasattr(self.config.hsv_to_rgb, 'cache_clear'):
+            self.config.hsv_to_rgb.cache_clear()
         
         # Clear any other caches
         logger.info("Cleared all caches")
