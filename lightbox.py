@@ -4,11 +4,7 @@ LightBox LED Matrix Controller - Main Entry Point
 Optimized implementation with platform-specific enhancements
 """
 
-import os
 import sys
-
-# Add the LightBox directory to Python path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from core.conductor import main
 

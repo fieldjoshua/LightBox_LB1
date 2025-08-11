@@ -83,35 +83,39 @@ class HardwareConfig:
         logger.debug(
             "Building HardwareConfig from mapping: %s", hub_cfg
         )
+        # IMPORTANT: With dataclasses(slots=True), class attribute access yields
+        # member descriptors. Use an instance for default fallbacks.
+        defaults = cls()
+
         return cls(
-            rows=int(hub_cfg.get("rows", cls.rows)),
-            cols=int(hub_cfg.get("cols", cls.cols)),
-            chain_length=int(hub_cfg.get("chain_length", cls.chain_length)),
-            parallel=int(hub_cfg.get("parallel", cls.parallel)),
-            pwm_bits=int(hub_cfg.get("pwm_bits", cls.pwm_bits)),
+            rows=int(hub_cfg.get("rows", defaults.rows)),
+            cols=int(hub_cfg.get("cols", defaults.cols)),
+            chain_length=int(hub_cfg.get("chain_length", defaults.chain_length)),
+            parallel=int(hub_cfg.get("parallel", defaults.parallel)),
+            pwm_bits=int(hub_cfg.get("pwm_bits", defaults.pwm_bits)),
             pwm_lsb_nanoseconds=int(
-                hub_cfg.get("pwm_lsb_nanoseconds", cls.pwm_lsb_nanoseconds)
+                hub_cfg.get("pwm_lsb_nanoseconds", defaults.pwm_lsb_nanoseconds)
             ),
-            gpio_slowdown=int(hub_cfg.get("gpio_slowdown", cls.gpio_slowdown)),
-            limit_refresh=int(hub_cfg.get("limit_refresh", cls.limit_refresh)),
-            pwm_dither_bits=int(hub_cfg.get("pwm_dither_bits", cls.pwm_dither_bits)),
-            hardware_pwm=str(hub_cfg.get("hardware_pwm", cls.hardware_pwm)),
-            scan_mode=int(hub_cfg.get("scan_mode", cls.scan_mode)),
+            gpio_slowdown=int(hub_cfg.get("gpio_slowdown", defaults.gpio_slowdown)),
+            limit_refresh=int(hub_cfg.get("limit_refresh", defaults.limit_refresh)),
+            pwm_dither_bits=int(hub_cfg.get("pwm_dither_bits", defaults.pwm_dither_bits)),
+            hardware_pwm=str(hub_cfg.get("hardware_pwm", defaults.hardware_pwm)),
+            scan_mode=int(hub_cfg.get("scan_mode", defaults.scan_mode)),
             row_address_type=int(
-                hub_cfg.get("row_address_type", cls.row_address_type)
+                hub_cfg.get("row_address_type", defaults.row_address_type)
             ),
-            multiplexing=int(hub_cfg.get("multiplexing", cls.multiplexing)),
+            multiplexing=int(hub_cfg.get("multiplexing", defaults.multiplexing)),
             cpu_isolation=bool(
-                hub_cfg.get("cpu_isolation", cls.cpu_isolation)
+                hub_cfg.get("cpu_isolation", defaults.cpu_isolation)
             ),
             show_refresh_rate=bool(
-                hub_cfg.get("show_refresh_rate", cls.show_refresh_rate)
+                hub_cfg.get("show_refresh_rate", defaults.show_refresh_rate)
             ),
             disable_hardware_pulsing=bool(
-                hub_cfg.get("disable_hardware_pulsing", cls.disable_hardware_pulsing)
+                hub_cfg.get("disable_hardware_pulsing", defaults.disable_hardware_pulsing)
             ),
             hardware_mapping=str(
-                hub_cfg.get("hardware_mapping", cls.hardware_mapping)
+                hub_cfg.get("hardware_mapping", defaults.hardware_mapping)
             ),
         )
 
