@@ -259,7 +259,7 @@ class HUB75Driver(MatrixDriver):
             
         # Render to off-screen canvas for flicker-free updates
         if isinstance(frame_buffer, bytearray):
-            # Bytearray format - fast path
+            # Bytearray format - fast path (values may still be float on some paths)
             idx = 0
             for y in range(self.height):
                 for x in range(self.width):
@@ -267,6 +267,25 @@ class HUB75Driver(MatrixDriver):
                         r = frame_buffer[idx]
                         g = frame_buffer[idx + 1]
                         b = frame_buffer[idx + 2]
+                        # Clamp and cast to uint8 range defensively
+                        if isinstance(r, float):
+                            r = int(r)
+                        if isinstance(g, float):
+                            g = int(g)
+                        if isinstance(b, float):
+                            b = int(b)
+                        if r < 0:
+                            r = 0
+                        elif r > 255:
+                            r = 255
+                        if g < 0:
+                            g = 0
+                        elif g > 255:
+                            g = 255
+                        if b < 0:
+                            b = 0
+                        elif b > 255:
+                            b = 255
                         self.canvas.SetPixel(x, y, r, g, b)
                         idx += 3
         else:
@@ -276,6 +295,25 @@ class HUB75Driver(MatrixDriver):
                 for x in range(self.width):
                     if idx < len(frame_buffer):
                         r, g, b = frame_buffer[idx]
+                        # Clamp and cast to uint8 range defensively
+                        if isinstance(r, float):
+                            r = int(r)
+                        if isinstance(g, float):
+                            g = int(g)
+                        if isinstance(b, float):
+                            b = int(b)
+                        if r < 0:
+                            r = 0
+                        elif r > 255:
+                            r = 255
+                        if g < 0:
+                            g = 0
+                        elif g > 255:
+                            g = 255
+                        if b < 0:
+                            b = 0
+                        elif b > 255:
+                            b = 255
                         self.canvas.SetPixel(x, y, r, g, b)
                         idx += 1
         

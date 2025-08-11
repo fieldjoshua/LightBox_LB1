@@ -62,7 +62,10 @@ class ButtonController:
     def stop(self):
         """Stop button monitoring"""
         self.running = False
-        GPIO.cleanup()
+        try:
+            GPIO.cleanup()
+        except Exception:
+            pass
 
     # Backwards-compatible cleanup alias
     def cleanup(self):  # noqa: D401 – simple alias verb
